@@ -9,6 +9,7 @@ export default {
       `👋 Hola, *${nombre}*\n\n` +
       `╭─「 *MENÚ* 」\n` +
       `│ ${prefijo}menu\n` +
+      `│ ${prefijo}8ball (pregunta)\n` +
       `╰──────────────`
 
     await sock.sendMessage(jid, { text: texto }, { quoted: m })
