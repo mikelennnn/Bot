@@ -11,7 +11,7 @@ import path from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const CARPETA_SESION = path.join(__dirname, 'sesion_bot')
+const CARPETA_SESION = process.env.SESION_DIR || path.join(__dirname, 'sesion_bot')
 const PREFIJO = '#'
 
 const comandos = new Map()
