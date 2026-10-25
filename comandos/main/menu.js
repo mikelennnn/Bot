@@ -9,6 +9,7 @@ export default {
       `👋 Hola, *${nombre}*\n\n` +
       `╭─「 *MENÚ* 」\n` +
       `│ ${prefijo}menu\n` +
+      `│ ${prefijo}ping\n` +
       `│ ${prefijo}8ball (pregunta)\n` +
       `╰──────────────`
 
