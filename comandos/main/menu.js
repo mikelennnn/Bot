@@ -69,14 +69,32 @@ export default {
       `┃ ❯  \`Muestra este menu\`\n` +
       `╰━━━━━━━━━━━━━━━━━╯`
 
-    await sock.sendMessage(
-      jid,
-      {
-        image: { url: 'https://i.imgur.com/9OD20dD.png' },
-        caption: texto,
-        mentions: [sender]
-      },
-      { quoted: m }
-    )
+    const sendMenu = async (attempt = 0) => {
+      try {
+        await sock.sendMessage(
+          jid,
+          {
+            image: { url: 'https://i.imgur.com/9OD20dD.png' },
+            caption: texto,
+            mentions: [sender]
+          },
+          { quoted: m }
+        )
+      } catch (e) {
+        const msg = e?.message || ''
+        if ((msg.includes('429') || e?.output?.statusCode === 429) && attempt < 3) {
+          const delay = 1000 * Math.pow(2, attempt)
+          await new Promise(r => setTimeout(r, delay))
+          return sendMenu(attempt + 1)
+        }
+        try {
+          await sock.sendMessage(jid, { text: texto, mentions: [sender] }, { quoted: m })
+        } catch (err) {
+          // ignore
+        }
+      }
+    }
+
+    await sendMenu()
   }
 }
