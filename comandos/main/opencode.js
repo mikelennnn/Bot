@@ -2,7 +2,7 @@ let lastDispatch = 0
 
 export default {
   name: 'opencode',
-  alias: [],
+  alias: ['oc'],
   async execute(sock, m, { texto, prefijo }) {
     const jid = m.key.remoteJid
     const senderJid = m.key.participant || m.key.remoteJid
@@ -16,13 +16,22 @@ export default {
       return
     }
 
-    // Extract text after #opencode
     const prefixLower = prefijo.toLowerCase()
     const textoLower = texto.toLowerCase()
     const cmdName = 'opencode'
-    // Find position after command name
-    const idx = textoLower.indexOf(prefixLower + cmdName)
-    if (idx === -1) return
+    const aliasName = 'oc'
+    let idx = textoLower.indexOf(prefixLower + cmdName)
+    if (idx === -1) {
+      idx = textoLower.indexOf(prefixLower + aliasName)
+      if (idx === -1) return
+      let tarea = texto.slice(idx + prefixLower.length + aliasName.length).trim()
+      if (!tarea) {
+        await sock.sendMessage(jid, { text: 'Pide la tarea' }, { quoted: m })
+        return
+      }
+      await this._dispatch(sock, jid, m, tarea)
+      return
+    }
     let tarea = texto.slice(idx + prefixLower.length + cmdName.length).trim()
 
     if (!tarea) {
@@ -30,18 +39,26 @@ export default {
       return
     }
 
+    await this._dispatch(sock, jid, m, tarea)
+  },
+
+  async _dispatch(sock, jid, m, tarea) {
     const now = Date.now()
     if (now - lastDispatch < 30000) {
-      // Avoid duplicate tasks within 30s - just ignore silently or could respond, but issue says "Evita tareas duplicadas con un límite de una tarea cada 30 segundos." - probably ignore without spamming
       return
     }
 
     await sock.sendMessage(jid, { text: 'Recibido' }, { quoted: m })
 
-    const ghRepo = process.env.GH_REPO || ''
-    const ghToken = process.env.GH_DISPATCH_TOKEN || ''
-    const workflow = 'opencode.yml'
-    const ref = 'main'
+    const ghRepo = process.env.GH_REPO || process.env.REPO || ''
+    const ghToken = process.env.GH_DISPATCH_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || ''
+    const workflow = process.env.OPENCODE_WORKFLOW || 'opencode.yml'
+    const ref = process.env.OPENCODE_REF || 'main'
+
+    if (!ghRepo || !ghToken) {
+      await sock.sendMessage(jid, { text: 'Error al enviar la tarea' }, { quoted: m })
+      return
+    }
 
     try {
       const url = `https://api.github.com/repos/${ghRepo}/actions/workflows/${workflow}/dispatches`
@@ -56,7 +73,9 @@ export default {
         body: JSON.stringify({
           ref,
           inputs: {
-            tarea
+            tarea,
+            task: tarea,
+            prompt: tarea
           }
         })
       })
@@ -66,12 +85,11 @@ export default {
         await sock.sendMessage(jid, { text: `Tarea enviada\n${actionsUrl}` }, { quoted: m })
         lastDispatch = now
       } else {
-        const errText = await res.text().catch(() => '')
-        // Don't log token or task text
-        await sock.sendMessage(jid, { text: `Error al enviar la tarea` }, { quoted: m })
+        await res.text().catch(() => '')
+        await sock.sendMessage(jid, { text: 'Error al enviar la tarea' }, { quoted: m })
       }
     } catch (e) {
-      await sock.sendMessage(jid, { text: `Error al enviar la tarea` }, { quoted: m })
+      await sock.sendMessage(jid, { text: 'Error al enviar la tarea' }, { quoted: m })
     }
   }
 }
