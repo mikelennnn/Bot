@@ -1,0 +1,180 @@
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+import makeWASocket, {
+  useMultiFileAuthState,
+  DisconnectReason,
+  fetchLatestBaileysVersion,
+  Browsers
+} from '@itsliaaa/baileys'
+import pino from 'pino'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const ROOT_DIR = path.join(__dirname, '..', '..')
+const MAX_SUBBOTS = 15
+
+const subbotsActivos = new Map()
+
+function contarSubbots() {
+  let maxNum = 0
+  try {
+    const entradas = fs.readdirSync(ROOT_DIR)
+    for (const e of entradas) {
+      const m = e.match(/^sesion_erzabot_subbot(\d+)$/)
+      if (m) {
+        const num = parseInt(m[1])
+        if (num > maxNum) maxNum = num
+      }
+    }
+  } catch (e) {}
+  return maxNum
+}
+
+function obtenerSiguienteNumero() {
+  const actual = contarSubbots()
+  if (actual >= MAX_SUBBOTS) return null
+  return actual + 1
+}
+
+function mensajeError() {
+  return (
+    `╭━━━━〔❌ 𝐄𝐑𝐑𝐎𝐑〕━━━━╮\n` +
+    `┃ 𝚫 *Uso incorrecto*\n` +
+    `┃\n` +
+    `┃ ❯ *Uso correcto:*\n` +
+    `┃    #code (tu número)\n` +
+    `┃\n` +
+    `┃ ❯ *Ejemplo:*\n` +
+    `┃    #code 52000000000\n` +
+    `╰━━━━━━━━━━━━━━━━━━━╯`
+  )
+}
+
+function mensajeCreando() {
+  return (
+    `╭━━━━〔🤍 𝐒𝐔𝐁𝐁𝐎𝐓〕━━━━╮\n` +
+    `┃ 𝚫 *Creando tu subbot...*\n` +
+    `┃ ❯ *esto puede tardar unos segundos*\n` +
+    `╰━━━━━━━━━━━━━━━━━━━╯`
+  )
+}
+
+function mensajeVincular() {
+  return (
+    `╭━━━━〔🤍 𝐒𝐔𝐁𝐁𝐎𝐓〕━━━━╮\n` +
+    `┃ 𝚫 *Vincula tu Subbot*\n` +
+    `┃\n` +
+    `┃ ❯ 1. Abre WhatsApp y pulsa los *3 puntitos* ⋮\n` +
+    `┃ ❯ 2. Entra en *Dispositivos vinculados*\n` +
+    `┃ ❯ 3. Pulsa *Vincular un dispositivo*\n` +
+    `┃ ❯ 4. Elige *Vincular con número de teléfono*\n` +
+    `┃ ❯ 5. Escribe el *código* que te enviaré a continuación\n` +
+    `┃\n` +
+    `┃ ⏳ _El código caduca en poco tiempo, úsalo enseguida._ \n` +
+    `╰━━━━━━━━━━━━━━━━━━━╯`
+  )
+}
+
+function mensajeConectado() {
+  return (
+    `╭━━━━〔🤍 𝐒𝐔𝐁𝐁𝐎𝐓〕━━━━╮\n` +
+    `┃ 𝚫 *Subbot conectado*\n` +
+    `┃ ❯ *Listo para usar*\n` +
+    `╰━━━━━━━━━━━━━━━━━━━╯`
+  )
+}
+
+async function crearSubbot(sock, jid, numero, quotedMsg) {
+  const numSubbot = obtenerSiguienteNumero()
+  if (!numSubbot) {
+    await sock.sendMessage(jid, { text: 'Límite de subbots alcanzado (15/15)' }, { quoted: quotedMsg })
+    return
+  }
+
+  const carpetaSesion = path.join(ROOT_DIR, `sesion_erzabot_subbot${numSubbot}`)
+  
+  // Enviar mensaje creando
+  await sock.sendMessage(jid, { text: mensajeCreando() }, { quoted: quotedMsg })
+
+  try {
+    const { state, saveCreds } = await useMultiFileAuthState(carpetaSesion)
+    const { version } = await fetchLatestBaileysVersion()
+
+    const sockSub = makeWASocket({
+      version,
+      logger: pino({ level: 'silent' }),
+      auth: state,
+      browser: Browsers.ubuntu('Chrome'),
+      printQRInTerminal: false,
+      markOnlineOnConnect: false
+    })
+
+    subbotsActivos.set(numSubbot, { sock: sockSub, numero, carpetaSesion })
+
+    sockSub.ev.on('creds.update', saveCreds)
+
+    sockSub.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
+      if (connection === 'open') {
+        try {
+          await sock.sendMessage(jid, { text: mensajeConectado() }, { quoted: quotedMsg })
+        } catch (e) {}
+      }
+
+      if (connection === 'close') {
+        const codigo = lastDisconnect?.error?.output?.statusCode
+        if (codigo === DisconnectReason.loggedOut) {
+          try {
+            fs.rmSync(carpetaSesion, { recursive: true, force: true })
+          } catch (e) {}
+          subbotsActivos.delete(numSubbot)
+        }
+      }
+    })
+
+    // Enviar instrucciones de vinculación con botón del canal y footer del menu
+    const msgVincular = {
+      text: mensajeVincular() + '\n\n© mikelennn\n© ErzaBot',
+      footer: '© mikelennn\n© ErzaBot',
+      nativeFlow: [
+        {
+          text: '⬜ CANAL',
+          url: 'https://whatsapp.com/channel/0029VbDvslnJJhzarICFvv0L',
+          useWebview: true
+        }
+      ]
+    }
+
+    await sock.sendMessage(jid, msgVincular, { quoted: quotedMsg })
+
+    // Pedir código de emparejamiento
+    try {
+      const codigo = await sockSub.requestPairingCode(numero)
+      await sock.sendMessage(jid, { text: `*Código:* ${codigo}` }, { quoted: quotedMsg })
+    } catch (e) {
+      await sock.sendMessage(jid, { text: `Error al generar código: ${e?.message || e}` }, { quoted: quotedMsg })
+    }
+  } catch (e) {
+    await sock.sendMessage(jid, { text: `Error al crear subbot: ${e?.message || e}` }, { quoted: quotedMsg })
+  }
+}
+
+export default {
+  name: 'code',
+  alias: ['subbot'],
+  async execute(sock, m, { args }) {
+    const jid = m.key.remoteJid
+
+    if (!args || args.length === 0) {
+      await sock.sendMessage(jid, { text: mensajeError() }, { quoted: m })
+      return
+    }
+
+    const numero = args[0].replace(/\D/g, '')
+    if (!numero || numero.length < 8) {
+      await sock.sendMessage(jid, { text: mensajeError() }, { quoted: m })
+      return
+    }
+
+    await crearSubbot(sock, jid, numero, m)
+  }
+}

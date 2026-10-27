@@ -16,6 +16,10 @@ const countCommands = (dir) => {
     if (entrada.isDirectory()) {
       total += countCommands(ruta)
     } else if (entrada.name.endsWith('.js')) {
+      const nombre = entrada.name.toLowerCase()
+      if (nombre === 'subbot.js' || nombre === 'code.js') {
+        continue
+      }
       total++
     }
   }
