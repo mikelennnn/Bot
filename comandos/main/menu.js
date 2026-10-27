@@ -69,23 +69,12 @@ export default {
     let groupName = '**'
     let miembros = '**'
 
-    if (isGroup) {
-      try {
-        const metadata = await sock.groupMetadata(jid)
-        groupName = metadata.subject || '**'
-        miembros = metadata.participants?.length || '**'
-      } catch (e) {
-        groupName = '**'
-        miembros = '**'
-      }
-    }
-
-    const texto =
+    const buildTexto = (g = groupName, mem = miembros) =>
       `╭━〔🤍𝐍𝐎𝐌𝐁𝐑𝐄🤍〕━╮\n` +
       `┃ ♡ 𝐔𝐒𝐔𝐀𝐑𝐈𝐎: @${sender.split('@')[0]}\n` +
       `┃ ♡ 𝐂𝐎𝐌𝐀𝐍𝐃𝐎𝐒: ${getCommandCount()}\n` +
-      `┃ ♡ 𝐆𝐑𝐔𝐏𝐎 ${groupName}\n` +
-      `┃ ♡ 𝐌𝐈𝐄𝐌𝐁𝐑𝐎𝐒: ${miembros}\n` +
+      `┃ ♡ 𝐆𝐑𝐔𝐏𝐎 ${g}\n` +
+      `┃ ♡ 𝐌𝐈𝐄𝐌𝐁𝐑𝐎𝐒: ${mem}\n` +
       `┃ ♡ 𝐂𝐑𝐄𝐀𝐃𝐎𝐑: *wa.me/+14123177704*\n` +
       `╰━━━━━━━━━━━━━━━━━╯\n\n` +
       `╭━━━━〔🤍 𝐌𝐀𝐈𝐍〕━━━━╮\n` +
@@ -94,13 +83,30 @@ export default {
       `┃ ❯  \`Muestra este menu\`\n` +
       `╰━━━━━━━━━━━━━━━━━╯`
 
-    const image = await getMenuImage()
+    const metadataPromise = isGroup
+      ? Promise.race([
+          sock.groupMetadata(jid).catch(() => null),
+          new Promise((resolve) => setTimeout(() => resolve(null), 800))
+        ])
+      : Promise.resolve(null)
+
+    const imagePromise = getMenuImage()
+
+    const [metadata, image] = await Promise.allSettled([metadataPromise, imagePromise])
+
+    if (metadata.status === 'fulfilled' && metadata.value) {
+      groupName = metadata.value.subject || groupName
+      miembros = metadata.value.participants?.length || miembros
+    }
+
+    const texto = buildTexto(groupName, miembros)
 
     try {
+      const imageRes = image.status === 'fulfilled' ? image.value : null
       await sock.sendMessage(
         jid,
-        image
-          ? { image, caption: texto, mentions: [sender] }
+        imageRes
+          ? { image: imageRes, caption: texto, mentions: [sender] }
           : { image: { url: IMAGE_URL }, caption: texto, mentions: [sender] },
         { quoted: m }
       )
