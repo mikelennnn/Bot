@@ -63,8 +63,9 @@ async function iniciar() {
 
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
     // Primera vez: pedir número y generar código de 8 dígitos
-    if (qr && !sock.authState.creds.registered && !pidiendoCodigo) {
+    if (connection === 'connecting' && !sock.authState.creds.registered && !pidiendoCodigo) {
       pidiendoCodigo = true
+      await new Promise((r) => setTimeout(r, 1500))
       const entrada =
         process.env.NUMERO ||
         (await preguntar(

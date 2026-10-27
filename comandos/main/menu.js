@@ -130,7 +130,7 @@ export default {
       await sock.sendMessage(
         jid,
         {
-          text: texto + '\n\n© mikelennn\n© ErzaBot',
+          text: texto,
           mentions: [sender],
           footer: '© mikelennn\n© ErzaBot',
           nativeFlow: [

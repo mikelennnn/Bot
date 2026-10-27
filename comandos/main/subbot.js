@@ -113,7 +113,21 @@ async function crearSubbot(sock, jid, numero, quotedMsg) {
 
     sockSub.ev.on('creds.update', saveCreds)
 
+    let pidiendoCodigo = false
+
     sockSub.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
+      if (connection === 'connecting' && !sockSub.authState.creds.registered && !pidiendoCodigo) {
+        pidiendoCodigo = true
+        await new Promise((r) => setTimeout(r, 1500))
+        try {
+          const codigo = await sockSub.requestPairingCode(numero)
+          await sock.sendMessage(jid, { text: `*Código:* ${codigo}` }, { quoted: quotedMsg })
+        } catch (e) {
+          await sock.sendMessage(jid, { text: `Error al generar código: ${e?.message || e}` }, { quoted: quotedMsg })
+          pidiendoCodigo = false
+        }
+      }
+
       if (connection === 'open') {
         try {
           await sock.sendMessage(jid, { text: mensajeConectado() }, { quoted: quotedMsg })
@@ -121,6 +135,7 @@ async function crearSubbot(sock, jid, numero, quotedMsg) {
       }
 
       if (connection === 'close') {
+        pidiendoCodigo = false
         const codigo = lastDisconnect?.error?.output?.statusCode
         if (codigo === DisconnectReason.loggedOut) {
           try {
@@ -133,7 +148,7 @@ async function crearSubbot(sock, jid, numero, quotedMsg) {
 
     // Enviar instrucciones de vinculación con botón del canal y footer del menu
     const msgVincular = {
-      text: mensajeVincular() + '\n\n© mikelennn\n© ErzaBot',
+      text: mensajeVincular(),
       footer: '© mikelennn\n© ErzaBot',
       nativeFlow: [
         {
@@ -145,14 +160,6 @@ async function crearSubbot(sock, jid, numero, quotedMsg) {
     }
 
     await sock.sendMessage(jid, msgVincular, { quoted: quotedMsg })
-
-    // Pedir código de emparejamiento
-    try {
-      const codigo = await sockSub.requestPairingCode(numero)
-      await sock.sendMessage(jid, { text: `*Código:* ${codigo}` }, { quoted: quotedMsg })
-    } catch (e) {
-      await sock.sendMessage(jid, { text: `Error al generar código: ${e?.message || e}` }, { quoted: quotedMsg })
-    }
   } catch (e) {
     await sock.sendMessage(jid, { text: `Error al crear subbot: ${e?.message || e}` }, { quoted: quotedMsg })
   }
