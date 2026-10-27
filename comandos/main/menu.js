@@ -1,56 +1,67 @@
 import fs from 'fs'
 import path from 'path'
-import { fileURLToPath, pathToFileURL } from 'url'
+import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const comandosDir = path.join(__dirname, '..')
+const IMAGE_URL = 'https://i.imgur.com/9OD20dD.png'
 
 let cachedCommandCount = null
+let imagePromise = null
 
-const countUniqueCommands = async (dir) => {
-  const cmds = new Set()
-  const stack = [dir]
-  while (stack.length > 0) {
-    const currentDir = stack.pop()
-    const entries = fs.readdirSync(currentDir, { withFileTypes: true })
-    for (const entrada of entries) {
-      const ruta = path.join(currentDir, entrada.name)
-      if (entrada.isDirectory()) {
-        stack.push(ruta)
-      } else if (entrada.name.endsWith('.js')) {
-        try {
-          const mod = await import(pathToFileURL(ruta).href)
-          const cmd = mod.default
-          if (cmd?.name) {
-            cmds.add(cmd.name)
-          }
-        } catch (e) {
-          // ignore
-        }
-      }
+const countCommands = (dir) => {
+  let total = 0
+  for (const entrada of fs.readdirSync(dir, { withFileTypes: true })) {
+    const ruta = path.join(dir, entrada.name)
+    if (entrada.isDirectory()) {
+      total += countCommands(ruta)
+    } else if (entrada.name.endsWith('.js')) {
+      total++
     }
   }
-  return cmds.size
+  return total
 }
 
-const getCommandCount = async () => {
-  if (cachedCommandCount !== null) return cachedCommandCount
-  try {
-    cachedCommandCount = await countUniqueCommands(comandosDir)
-    if (cachedCommandCount < 1) cachedCommandCount = 1
-    return cachedCommandCount
-  } catch (e) {
-    cachedCommandCount = 1
-    return cachedCommandCount
+const getCommandCount = () => {
+  if (cachedCommandCount === null) {
+    try {
+      cachedCommandCount = Math.max(countCommands(comandosDir), 1)
+    } catch (e) {
+      cachedCommandCount = 1
+    }
   }
+  return cachedCommandCount
+}
+
+const getMenuImage = () => {
+  if (!imagePromise) {
+    imagePromise = (async () => {
+      if (typeof fetch !== 'function') return null
+
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 15000)
+      try {
+        const res = await fetch(IMAGE_URL, { signal: controller.signal })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return Buffer.from(await res.arrayBuffer())
+      } finally {
+        clearTimeout(timeout)
+      }
+    })().catch(() => {
+      imagePromise = null
+      return null
+    })
+  }
+  return imagePromise
 }
 
 getCommandCount()
+getMenuImage()
 
 export default {
   name: 'menu',
   alias: ['help'],
-  async execute(sock, m, { prefijo }) {
+  async execute(sock, m) {
     const jid = m.key.remoteJid
     const isGroup = jid.endsWith('@g.us')
     const sender = m.key.participant || jid
@@ -69,12 +80,10 @@ export default {
       }
     }
 
-    const commandCount = await getCommandCount()
-
     const texto =
       `╭━〔🤍𝐍𝐎𝐌𝐁𝐑𝐄🤍〕━╮\n` +
       `┃ ♡ 𝐔𝐒𝐔𝐀𝐑𝐈𝐎: @${sender.split('@')[0]}\n` +
-      `┃ ♡ 𝐂𝐎𝐌𝐀𝐍𝐃𝐎𝐒: ${commandCount}\n` +
+      `┃ ♡ 𝐂𝐎𝐌𝐀𝐍𝐃𝐎𝐒: ${getCommandCount()}\n` +
       `┃ ♡ 𝐆𝐑𝐔𝐏𝐎 ${groupName}\n` +
       `┃ ♡ 𝐌𝐈𝐄𝐌𝐁𝐑𝐎𝐒: ${miembros}\n` +
       `┃ ♡ 𝐂𝐑𝐄𝐀𝐃𝐎𝐑: *wa.me/+14123177704*\n` +
@@ -85,48 +94,25 @@ export default {
       `┃ ❯  \`Muestra este menu\`\n` +
       `╰━━━━━━━━━━━━━━━━━╯`
 
-    const sendMenu = async (attempt = 0) => {
-      try {
-        await sock.sendMessage(
-          jid,
-          {
-            image: { url: 'https://i.imgur.com/9OD20dD.png' },
-            caption: texto,
-            mentions: [sender]
-          },
-          { quoted: m }
-        )
-        return
-      } catch (e) {
-        const msg = e?.message || ''
-        if ((msg.includes('429') || e?.output?.statusCode === 429) && attempt < 3) {
-          const delay = 1000 * Math.pow(2, attempt)
-          await new Promise(r => setTimeout(r, delay))
-          return sendMenu(attempt + 1)
-        }
-      }
+    const image = await getMenuImage()
 
-      try {
-        await sock.sendMessage(
-          jid,
-          {
-            image: { url: 'https://i.imgur.com/9OD20dD.png' },
-            caption: texto,
-            mentions: [sender]
-          }
-        )
-        return
-      } catch (e) {
-        // ignore
-      }
-
-      try {
-        await sock.sendMessage(jid, { text: texto, mentions: [sender] }, { quoted: m })
-      } catch (err) {
-        // ignore
-      }
+    try {
+      await sock.sendMessage(
+        jid,
+        image
+          ? { image, caption: texto, mentions: [sender] }
+          : { image: { url: IMAGE_URL }, caption: texto, mentions: [sender] },
+        { quoted: m }
+      )
+      return
+    } catch (e) {
+      // fallback a solo texto si falla el envio de la imagen
     }
 
-    await sendMenu()
+    try {
+      await sock.sendMessage(jid, { text: texto, mentions: [sender] }, { quoted: m })
+    } catch (e) {
+      // ignore
+    }
   }
 }
