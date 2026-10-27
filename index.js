@@ -13,9 +13,32 @@ import { fileURLToPath, pathToFileURL } from 'url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const CARPETA_SESION = process.env.SESION_DIR || path.join(__dirname, 'sesion_erzabot_bot')
 const PREFIJO = '#'
+const MEMORIA_FILE = path.join(__dirname, 'memoria.json')
 
 const comandos = new Map()
 let pidiendoCodigo = false
+
+function cargarMemoria() {
+  try {
+    if (fs.existsSync(MEMORIA_FILE)) {
+      const data = fs.readFileSync(MEMORIA_FILE, 'utf8')
+      return JSON.parse(data)
+    }
+  } catch (e) {
+    // ignore
+  }
+  return []
+}
+
+function guardarEnMemoria(entrada) {
+  try {
+    const memoria = cargarMemoria()
+    memoria.push({ ...entrada, fecha: new Date().toISOString() })
+    fs.writeFileSync(MEMORIA_FILE, JSON.stringify(memoria.slice(-2000), null, 2))
+  } catch (e) {
+    // ignore
+  }
+}
 
 async function cargarComandos(dir) {
   for (const entrada of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -115,7 +138,18 @@ async function iniciar() {
       if (!cmd) continue
 
       try {
+        guardarEnMemoria({
+          jid: m.key.remoteJid,
+          usuario: m.pushName || m.key.participant || 'Desconocido',
+          mensaje: texto,
+          comando: nombre.toLowerCase()
+        })
         await cmd.execute(sock, m, { args, texto, prefijo: PREFIJO })
+        guardarEnMemoria({
+          jid: m.key.remoteJid,
+          tipo: 'comando_ejecutado',
+          comando: nombre.toLowerCase()
+        })
       } catch (e) {
         console.log(`Error en #${nombre}:`, e?.message || e)
       }
