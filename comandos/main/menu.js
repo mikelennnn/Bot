@@ -81,9 +81,7 @@ export default {
       `┃ 𝚫 *#menu*\n` +
       `┃ 𝚫 *#help*\n` +
       `┃ ❯  \`Muestra este menu\`\n` +
-      `╰━━━━━━━━━━━━━━━━━╯\n\n` +
-      `© mikelennn\n` +
-      `© ErzaBot`
+      `╰━━━━━━━━━━━━━━━━━╯`
 
     const metadataPromise = isGroup
       ? Promise.race([
@@ -128,7 +126,7 @@ export default {
       await sock.sendMessage(
         jid,
         {
-          text: texto,
+          text: texto + '\n\n© mikelennn\n© ErzaBot',
           mentions: [sender],
           footer: '© mikelennn\n© ErzaBot',
           nativeFlow: [
