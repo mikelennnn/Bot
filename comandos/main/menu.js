@@ -81,7 +81,9 @@ export default {
       `┃ 𝚫 *#menu*\n` +
       `┃ 𝚫 *#help*\n` +
       `┃ ❯  \`Muestra este menu\`\n` +
-      `╰━━━━━━━━━━━━━━━━━╯`
+      `╰━━━━━━━━━━━━━━━━━╯\n\n` +
+      `© mikelennn\n` +
+      `© ErzaBot`
 
     const metadataPromise = isGroup
       ? Promise.race([
@@ -103,20 +105,42 @@ export default {
 
     try {
       const imageRes = image.status === 'fulfilled' ? image.value : null
-      await sock.sendMessage(
-        jid,
-        imageRes
-          ? { image: imageRes, caption: texto, mentions: [sender] }
-          : { image: { url: IMAGE_URL }, caption: texto, mentions: [sender] },
-        { quoted: m }
-      )
+      const messageContent = imageRes
+        ? { image: imageRes, caption: texto, mentions: [sender] }
+        : { image: { url: IMAGE_URL }, caption: texto, mentions: [sender] }
+
+      messageContent.footer = '© mikelennn\n© ErzaBot'
+      messageContent.nativeFlow = [
+        {
+          text: '⬜ CANAL',
+          url: 'https://whatsapp.com/channel/0029VbDvslnJJhzarICFvv0L',
+          useWebview: true
+        }
+      ]
+
+      await sock.sendMessage(jid, messageContent, { quoted: m })
       return
     } catch (e) {
       // fallback a solo texto si falla el envio de la imagen
     }
 
     try {
-      await sock.sendMessage(jid, { text: texto, mentions: [sender] }, { quoted: m })
+      await sock.sendMessage(
+        jid,
+        {
+          text: texto,
+          mentions: [sender],
+          footer: '© mikelennn\n© ErzaBot',
+          nativeFlow: [
+            {
+              text: '⬜ CANAL',
+              url: 'https://whatsapp.com/channel/0029VbDvslnJJhzarICFvv0L',
+              useWebview: true
+            }
+          ]
+        },
+        { quoted: m }
+      )
     } catch (e) {
       // ignore
     }
