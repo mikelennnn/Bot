@@ -84,6 +84,105 @@ function mensajeConectado() {
   )
 }
 
+async function levantarSubbot(ctx) {
+  const { numSubbot, carpetaSesion, numero, sock, jid, quotedMsg } = ctx
+
+  const { state, saveCreds } = await useMultiFileAuthState(carpetaSesion)
+  const { version } = await fetchLatestBaileysVersion()
+
+  const sockSub = makeWASocket({
+    version,
+    logger: pino({ level: 'silent' }),
+    auth: state,
+    browser: Browsers.ubuntu('Chrome'),
+    printQRInTerminal: false,
+    markOnlineOnConnect: false
+  })
+
+  subbotsActivos.set(numSubbot, { sock: sockSub, numero, carpetaSesion })
+
+  sockSub.ev.on('creds.update', saveCreds)
+
+  let pidiendoCodigo = false
+
+  sockSub.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
+    if (
+      (connection === 'connecting' || qr) &&
+      !sockSub.authState.creds.registered &&
+      !ctx.codigoEnviado &&
+      !pidiendoCodigo
+    ) {
+      pidiendoCodigo = true
+      await new Promise((r) => setTimeout(r, 1500))
+      try {
+        const codigo = await sockSub.requestPairingCode(numero)
+        ctx.codigoEnviado = true
+        await sock.sendMessage(jid, { text: `*Código:* ${codigo}` }, { quoted: quotedMsg })
+      } catch (e) {
+        await sock.sendMessage(
+          jid,
+          { text: `Error al generar código: ${e?.message || e}` },
+          { quoted: quotedMsg }
+        )
+        pidiendoCodigo = false
+      }
+    }
+
+    if (connection === 'open') {
+      if (!ctx.avisado) {
+        ctx.avisado = true
+        try {
+          await sock.sendMessage(jid, { text: mensajeConectado() }, { quoted: quotedMsg })
+        } catch (e) {}
+      }
+    }
+
+    if (connection === 'close') {
+      pidiendoCodigo = false
+      const status = lastDisconnect?.error?.output?.statusCode
+      const registrado = sockSub.authState.creds.registered
+
+      if (status === DisconnectReason.loggedOut) {
+        try {
+          fs.rmSync(carpetaSesion, { recursive: true, force: true })
+        } catch (e) {}
+        subbotsActivos.delete(numSubbot)
+        return
+      }
+
+      if (status === DisconnectReason.restartRequired || registrado) {
+        setTimeout(() => {
+          levantarSubbot(ctx).catch(async (e) => {
+            subbotsActivos.delete(numSubbot)
+            try {
+              await sock.sendMessage(
+                jid,
+                { text: `Error al reconectar subbot: ${e?.message || e}` },
+                { quoted: quotedMsg }
+              )
+            } catch (_) {}
+          })
+        }, 2000)
+        return
+      }
+
+      try {
+        fs.rmSync(carpetaSesion, { recursive: true, force: true })
+      } catch (e) {}
+      subbotsActivos.delete(numSubbot)
+      try {
+        await sock.sendMessage(
+          jid,
+          { text: 'No se pudo vincular. Vuelve a usar #code (tu número).' },
+          { quoted: quotedMsg }
+        )
+      } catch (e) {}
+    }
+  })
+
+  return sockSub
+}
+
 async function crearSubbot(sock, jid, numero, quotedMsg) {
   const numSubbot = obtenerSiguienteNumero()
   if (!numSubbot) {
@@ -92,61 +191,23 @@ async function crearSubbot(sock, jid, numero, quotedMsg) {
   }
 
   const carpetaSesion = path.join(ROOT_DIR, `sesion_erzabot_subbot${numSubbot}`)
-  
-  // Enviar mensaje creando
+
   await sock.sendMessage(jid, { text: mensajeCreando() }, { quoted: quotedMsg })
 
   try {
-    const { state, saveCreds } = await useMultiFileAuthState(carpetaSesion)
-    const { version } = await fetchLatestBaileysVersion()
+    const ctx = {
+      numSubbot,
+      carpetaSesion,
+      numero,
+      sock,
+      jid,
+      quotedMsg,
+      codigoEnviado: false,
+      avisado: false
+    }
 
-    const sockSub = makeWASocket({
-      version,
-      logger: pino({ level: 'silent' }),
-      auth: state,
-      browser: Browsers.ubuntu('Chrome'),
-      printQRInTerminal: false,
-      markOnlineOnConnect: false
-    })
+    await levantarSubbot(ctx)
 
-    subbotsActivos.set(numSubbot, { sock: sockSub, numero, carpetaSesion })
-
-    sockSub.ev.on('creds.update', saveCreds)
-
-    let pidiendoCodigo = false
-
-    sockSub.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
-      if ((connection === 'connecting' || qr) && !sockSub.authState.creds.registered && !pidiendoCodigo) {
-        pidiendoCodigo = true
-        await new Promise((r) => setTimeout(r, 1500))
-        try {
-          const codigo = await sockSub.requestPairingCode(numero)
-          await sock.sendMessage(jid, { text: `*Código:* ${codigo}` }, { quoted: quotedMsg })
-        } catch (e) {
-          await sock.sendMessage(jid, { text: `Error al generar código: ${e?.message || e}` }, { quoted: quotedMsg })
-          pidiendoCodigo = false
-        }
-      }
-
-      if (connection === 'open') {
-        try {
-          await sock.sendMessage(jid, { text: mensajeConectado() }, { quoted: quotedMsg })
-        } catch (e) {}
-      }
-
-      if (connection === 'close') {
-        pidiendoCodigo = false
-        const codigo = lastDisconnect?.error?.output?.statusCode
-        if (codigo === DisconnectReason.loggedOut) {
-          try {
-            fs.rmSync(carpetaSesion, { recursive: true, force: true })
-          } catch (e) {}
-          subbotsActivos.delete(numSubbot)
-        }
-      }
-    })
-
-    // Enviar instrucciones de vinculación con botón del canal y footer del menu
     const msgVincular = {
       text: mensajeVincular(),
       footer: '© mikelennn\n© ErzaBot',
