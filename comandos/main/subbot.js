@@ -115,8 +115,8 @@ async function crearSubbot(sock, jid, numero, quotedMsg) {
 
     let pidiendoCodigo = false
 
-    sockSub.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
-      if (connection === 'connecting' && !sockSub.authState.creds.registered && !pidiendoCodigo) {
+    sockSub.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
+      if ((connection === 'connecting' || qr) && !sockSub.authState.creds.registered && !pidiendoCodigo) {
         pidiendoCodigo = true
         await new Promise((r) => setTimeout(r, 1500))
         try {
