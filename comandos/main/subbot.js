@@ -103,6 +103,37 @@ async function levantarSubbot(ctx) {
 
   sockSub.ev.on('creds.update', saveCreds)
 
+  sockSub.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (type !== 'notify') return
+    for (const m of messages) {
+      if (!m.message) continue
+
+      const texto =
+        m.message.conversation ||
+        m.message.extendedTextMessage?.text ||
+        m.message.imageMessage?.caption ||
+        m.message.videoMessage?.caption ||
+        ''
+
+      if (!texto.startsWith(ctx.prefijo)) continue
+
+      const [nombre, ...args] = texto.slice(ctx.prefijo.length).trim().split(/\s+/)
+      const cmd = ctx.comandos.get(nombre.toLowerCase())
+      if (!cmd) continue
+
+      try {
+        await cmd.execute(sockSub, m, {
+          args,
+          texto,
+          prefijo: ctx.prefijo,
+          comandos: ctx.comandos
+        })
+      } catch (e) {
+        console.log(`Error en subbot${numSubbot} #${nombre}:`, e?.message || e)
+      }
+    }
+  })
+
   let pidiendoCodigo = false
 
   sockSub.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
@@ -183,7 +214,7 @@ async function levantarSubbot(ctx) {
   return sockSub
 }
 
-async function crearSubbot(sock, jid, numero, quotedMsg) {
+async function crearSubbot(sock, jid, numero, quotedMsg, comandos, prefijo) {
   const numSubbot = obtenerSiguienteNumero()
   if (!numSubbot) {
     await sock.sendMessage(jid, { text: 'Límite de subbots alcanzado (15/15)' }, { quoted: quotedMsg })
@@ -202,6 +233,8 @@ async function crearSubbot(sock, jid, numero, quotedMsg) {
       sock,
       jid,
       quotedMsg,
+      comandos,
+      prefijo: prefijo || '#',
       codigoEnviado: false,
       avisado: false
     }
@@ -229,7 +262,7 @@ async function crearSubbot(sock, jid, numero, quotedMsg) {
 export default {
   name: 'code',
   alias: ['subbot'],
-  async execute(sock, m, { args }) {
+  async execute(sock, m, { args, comandos, prefijo }) {
     const jid = m.key.remoteJid
 
     if (!args || args.length === 0) {
@@ -243,6 +276,6 @@ export default {
       return
     }
 
-    await crearSubbot(sock, jid, numero, m)
+    await crearSubbot(sock, jid, numero, m, comandos, prefijo)
   }
 }
