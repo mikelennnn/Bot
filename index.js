@@ -9,6 +9,7 @@ import readline from 'readline'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
+import { iniciarAnuncio } from './anuncio.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const CARPETA_SESION = process.env.SESION_DIR || path.join(__dirname, 'sesion_erzabot_bot')
@@ -84,6 +85,7 @@ async function iniciar() {
 
     if (connection === 'open') {
       console.log('✅ Bot conectado')
+      iniciarAnuncio(sock)
     }
 
     if (connection === 'close') {
