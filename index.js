@@ -99,7 +99,7 @@ async function iniciar() {
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return
     for (const m of messages) {
-      if (!m.message || m.key.fromMe) continue
+      if (!m.message) continue
 
       const texto =
         m.message.conversation ||
