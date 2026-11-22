@@ -3,16 +3,15 @@ import makeWASocket, {
   DisconnectReason,
   fetchLatestBaileysVersion,
   Browsers
-} from '@itsliaaa/baileys'
+} from '@whiskeysockets/baileys'
 import pino from 'pino'
 import readline from 'readline'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
-import { iniciarAnuncio } from './anuncio.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const CARPETA_SESION = process.env.SESION_DIR || path.join(__dirname, 'sesion_erzabot_bot')
+const CARPETA_SESION = process.env.SESION_DIR || path.join(__dirname, 'sesion_bot')
 const PREFIJO = '#'
 
 const comandos = new Map()
@@ -64,9 +63,8 @@ async function iniciar() {
 
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
     // Primera vez: pedir número y generar código de 8 dígitos
-    if ((connection === 'connecting' || qr) && !sock.authState.creds.registered && !pidiendoCodigo) {
+    if (qr && !sock.authState.creds.registered && !pidiendoCodigo) {
       pidiendoCodigo = true
-      await new Promise((r) => setTimeout(r, 1500))
       const entrada =
         process.env.NUMERO ||
         (await preguntar(
@@ -85,7 +83,6 @@ async function iniciar() {
 
     if (connection === 'open') {
       console.log('✅ Bot conectado')
-      iniciarAnuncio(sock)
     }
 
     if (connection === 'close') {
@@ -102,7 +99,7 @@ async function iniciar() {
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return
     for (const m of messages) {
-      if (!m.message) continue
+      if (!m.message || m.key.fromMe) continue
 
       const texto =
         m.message.conversation ||
@@ -118,7 +115,7 @@ async function iniciar() {
       if (!cmd) continue
 
       try {
-        await cmd.execute(sock, m, { args, texto, prefijo: PREFIJO, comandos })
+        await cmd.execute(sock, m, { args, texto, prefijo: PREFIJO })
       } catch (e) {
         console.log(`Error en #${nombre}:`, e?.message || e)
       }
