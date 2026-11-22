@@ -19,6 +19,8 @@ function estadoPing(ms) {
 export default {
   name: 'ping',
   alias: ['pong'],
+  categoria: 'main',
+  desc: 'Muestra el ping del bot',
   async execute(sock, m) {
     const jid = m.key.remoteJid
 

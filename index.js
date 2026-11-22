@@ -33,6 +33,39 @@ async function cargarComandos(dir) {
   }
 }
 
+// Saca el texto de un mensaje normal, de un botón pulsado o de una lista
+function extraerTexto(message) {
+  let msg = message
+  for (let i = 0; i < 3; i++) {
+    const interno =
+      msg.ephemeralMessage?.message ||
+      msg.viewOnceMessage?.message ||
+      msg.viewOnceMessageV2?.message ||
+      msg.documentWithCaptionMessage?.message
+    if (!interno) break
+    msg = interno
+  }
+
+  const flujo = msg.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson
+  if (flujo) {
+    try {
+      const id = JSON.parse(flujo).id
+      if (id) return String(id)
+    } catch (e) {}
+  }
+
+  return (
+    msg.conversation ||
+    msg.extendedTextMessage?.text ||
+    msg.imageMessage?.caption ||
+    msg.videoMessage?.caption ||
+    msg.buttonsResponseMessage?.selectedButtonId ||
+    msg.listResponseMessage?.singleSelectReply?.selectedRowId ||
+    msg.templateButtonReplyMessage?.selectedId ||
+    ''
+  )
+}
+
 function preguntar(texto) {
   const rl = readline.createInterface({
     input: process.stdin,
@@ -100,13 +133,10 @@ async function iniciar() {
     if (type !== 'notify') return
     for (const m of messages) {
       if (!m.message) continue
+      // Evita bucles: ignora los mensajes que envió el propio bot (no los escritos desde el teléfono)
+      if (m.key.fromMe && m.key.id?.includes('STARFALL')) continue
 
-      const texto =
-        m.message.conversation ||
-        m.message.extendedTextMessage?.text ||
-        m.message.imageMessage?.caption ||
-        m.message.videoMessage?.caption ||
-        ''
+      const texto = extraerTexto(m.message)
 
       if (!texto.startsWith(PREFIJO)) continue
 
