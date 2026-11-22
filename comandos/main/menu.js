@@ -1,4 +1,5 @@
 const URL_CANAL = 'https://whatsapp.com/channel/0029Vb9eodxFsn0bzlsFDr0F'
+const IMAGEN = 'https://i.imgur.com/dQg1FJH.jpeg'
 const FOOTER = '© Mikelennn\n© ErzaBot'
 
 export default {
@@ -41,7 +42,8 @@ export default {
     await sock.sendMessage(
       jid,
       {
-        text: texto,
+        image: { url: IMAGEN },
+        caption: texto,
         footer: FOOTER,
         mentions: [usuarioJid],
         nativeFlow: [
