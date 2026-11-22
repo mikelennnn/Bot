@@ -97,6 +97,7 @@ async function iniciar() {
   })
 
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    console.log(`[msg] type=${type} cantidad=${messages.length}`)
     if (type !== 'notify') return
     for (const m of messages) {
       if (!m.message) continue
@@ -108,6 +109,7 @@ async function iniciar() {
         m.message.videoMessage?.caption ||
         ''
 
+      console.log(`[msg] de=${m.key.remoteJid} fromMe=${m.key.fromMe} texto=${JSON.stringify(texto.slice(0, 40))}`)
       if (!texto.startsWith(PREFIJO)) continue
 
       const [nombre, ...args] = texto.slice(PREFIJO.length).trim().split(/\s+/)
