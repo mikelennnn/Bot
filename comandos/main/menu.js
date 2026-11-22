@@ -39,11 +39,17 @@ export default {
       `┃ ❯ \`Muestra este menu\`\n` +
       `╰━━━━━━━━━━━━━━━━━╯`
 
+    // Imagen primero; el botón interactivo no se muestra bien con imagen adjunta
+    try {
+      await sock.sendMessage(jid, { image: { url: IMAGEN } })
+    } catch (e) {
+      console.log('Error al enviar la imagen del menú:', e?.message || e)
+    }
+
     await sock.sendMessage(
       jid,
       {
-        image: { url: IMAGEN },
-        caption: texto,
+        text: texto,
         footer: FOOTER,
         mentions: [usuarioJid],
         nativeFlow: [
