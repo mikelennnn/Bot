@@ -115,7 +115,7 @@ async function iniciar() {
       if (!cmd) continue
 
       try {
-        await cmd.execute(sock, m, { args, texto, prefijo: PREFIJO })
+        await cmd.execute(sock, m, { args, texto, prefijo: PREFIJO, comandos })
       } catch (e) {
         console.log(`Error en #${nombre}:`, e?.message || e)
       }
