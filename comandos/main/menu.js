@@ -2,6 +2,19 @@ const URL_CANAL = 'https://whatsapp.com/channel/0029Vb9eodxFsn0bzlsFDr0F'
 const IMAGEN = 'https://i.imgur.com/dQg1FJH.jpeg'
 const FOOTER = '© Mikelennn\n© ErzaBot'
 
+let miniatura = null
+async function obtenerMiniatura() {
+  if (miniatura) return miniatura
+  try {
+    const r = await fetch(IMAGEN)
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    miniatura = Buffer.from(await r.arrayBuffer())
+  } catch (e) {
+    console.log('No se pudo descargar la imagen del menú:', e?.message || e)
+  }
+  return miniatura
+}
+
 export default {
   name: 'menu',
   alias: ['help'],
@@ -39,14 +52,23 @@ export default {
       `┃ ❯ \`Muestra este menu\`\n` +
       `╰━━━━━━━━━━━━━━━━━╯`
 
+    const thumbnail = await obtenerMiniatura()
+
     await sock.sendMessage(
       jid,
       {
-        image: { url: IMAGEN },
-        caption: texto,
+        text: texto,
         footer: FOOTER,
-        interactiveAsTemplate: true,
         mentions: [usuarioJid],
+        ...(thumbnail && {
+          externalAdReply: {
+            title: 'ERZA-BOT',
+            body: '© Mikelennn',
+            thumbnail,
+            largeThumbnail: true,
+            url: URL_CANAL
+          }
+        }),
         nativeFlow: [
           {
             text: '♦️ CANAL',
