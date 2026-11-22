@@ -1,3 +1,6 @@
+const URL_CANAL = 'https://whatsapp.com/channel/0029Vb9eodxFsn0bzlsFDr0F'
+const FOOTER = '© Mikelennn\n© ErzaBot'
+
 const dos = (n) => String(n).padStart(2, '0')
 
 function formatearActivo(segundos) {
@@ -43,6 +46,14 @@ export default {
       `┃ ♡ 𝐄𝐒𝐓𝐀𝐃𝐎: *${estadoPing(ms)}*\n` +
       `╰━━━━━━━━━━━━━━━━━╯`
 
-    await sock.sendMessage(jid, { text: resultado }, { quoted: m })
+    await sock.sendMessage(
+      jid,
+      {
+        text: resultado,
+        footer: FOOTER,
+        nativeFlow: [{ text: '♦️ CANAL', url: URL_CANAL, useWebview: true }]
+      },
+      { quoted: m }
+    )
   }
 }

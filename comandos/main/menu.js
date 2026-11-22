@@ -84,6 +84,9 @@ export default {
       `┃ 𝚫 *#menu*\n` +
       `┃ 𝚫 *#help*\n` +
       `┃ ❯ \`Muestra este menu\`\n` +
+      `┃ 𝚫 *#ping*\n` +
+      `┃ 𝚫 *#pong*\n` +
+      `┃ ❯ \`Muestra el ping del bot\`\n` +
       `╰━━━━━━━━━━━━━━━━━╯`
 
     try {
