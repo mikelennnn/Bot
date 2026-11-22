@@ -3,7 +3,7 @@ import makeWASocket, {
   DisconnectReason,
   fetchLatestBaileysVersion,
   Browsers
-} from '@whiskeysockets/baileys'
+} from '@itsliaaa/baileys'
 import pino from 'pino'
 import readline from 'readline'
 import fs from 'fs'
