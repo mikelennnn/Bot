@@ -14,6 +14,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const CARPETA_SESION = process.env.SESION_DIR || path.join(__dirname, 'sesion_bot')
 const PREFIJO = '#'
 
+// Grupos donde el bot no responde a nada (códigos de sus enlaces de invitación)
+const GRUPOS_IGNORADOS = ['GDQuWpvGBbWI4JcpNKghzG', 'CpIIZ50p0gsBmyI7FQraBT']
+const jidsIgnorados = new Set()
+
 const comandos = new Map()
 let pidiendoCodigo = false
 
@@ -31,6 +35,19 @@ async function cargarComandos(dir) {
       }
     }
   }
+}
+
+// Convierte los enlaces de invitación en el ID de cada grupo
+async function cargarGruposIgnorados(sock) {
+  for (const codigo of GRUPOS_IGNORADOS) {
+    try {
+      const info = await sock.groupGetInviteInfo(codigo)
+      if (info?.id) jidsIgnorados.add(info.id)
+    } catch (e) {
+      console.log(`No se pudo leer el enlace ${codigo}:`, e?.message || e)
+    }
+  }
+  console.log(`Grupos ignorados: ${jidsIgnorados.size}/${GRUPOS_IGNORADOS.length}`)
 }
 
 function preguntar(texto) {
@@ -83,6 +100,7 @@ async function iniciar() {
 
     if (connection === 'open') {
       console.log('✅ Bot conectado')
+      cargarGruposIgnorados(sock)
     }
 
     if (connection === 'close') {
@@ -100,6 +118,7 @@ async function iniciar() {
     if (type !== 'notify') return
     for (const m of messages) {
       if (!m.message) continue
+      if (jidsIgnorados.has(m.key.remoteJid)) continue
 
       const texto =
         m.message.conversation ||
