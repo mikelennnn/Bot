@@ -5,8 +5,8 @@ import path from 'path'
 import ffmpeg from 'ffmpeg-static'
 import { downloadContentFromMessage, prepareWAMessageMedia, generateWAMessageFromContent } from '@itsliaaa/baileys'
 
-// WhatsApp deja hasta 5 segundos de sonido en stickers hechos con video
-const MAX_SEGUNDOS = 5
+// Máximo de WhatsApp: animación de hasta 10 s y audio de hasta 10 s en stickers con sonido
+const MAX_SEGUNDOS = 10
 const MAX_BYTES = 500 * 1024 // límite de tamaño de un sticker animado
 
 const URL_CANAL = 'https://whatsapp.com/channel/0029Vb9eodxFsn0bzlsFDr0F'
@@ -77,8 +77,11 @@ async function descargar(video, parcial) {
   return { buffer: Buffer.concat(partes), parcial: !!opciones.endByte }
 }
 
-const FPS = 8 // menos fotogramas = mucho más rápido y el sticker cabe en 500 KB al primer intento
-const FILTRO = `fps=${FPS},scale=512:512:force_original_aspect_ratio=decrease:flags=fast_bilinear,pad=512:512:-1:-1:color=0x00000000,format=yuva420p`
+// Hasta 5 s: 8 fps con buena calidad. Más largos: 6 fps y más compresión para no pasar de 500 KB
+const ajustes = (segundos) =>
+  segundos > 5 ? { fps: 6, calidades: [15, 5, 1] } : { fps: 8, calidades: [35, 15, 5] }
+const filtro = (fps) =>
+  `fps=${fps},scale=512:512:force_original_aspect_ratio=decrease:flags=fast_bilinear,pad=512:512:-1:-1:color=0x00000000,format=yuva420p`
 const BYTES_FOTOGRAMA = 512 * 512 * 2.5 // yuva420p
 
 // Mira qué pistas tiene el archivo (ffmpeg -i sin salida termina con error, pero lista las pistas)
@@ -94,17 +97,19 @@ function pistas(entrada) {
 
 // Lee el video UNA sola vez: saca los fotogramas ya escalados y el audio
 async function extraer(entrada, carpeta, segundosVideo) {
+  const duracion = Math.min(MAX_SEGUNDOS, segundosVideo || MAX_SEGUNDOS)
+  const { fps } = ajustes(duracion)
   const fotogramas = path.join(carpeta, 'fotogramas.nut')
   const ogg = path.join(carpeta, 'audio.ogg')
   const { video, audio: conAudio } = await pistas(entrada)
   if (!video) throw new Error('no se pudo leer el video')
   await ejecutar([
     '-y', '-skip_loop_filter', 'all', '-flags2', '+fast', '-t', String(MAX_SEGUNDOS), '-i', entrada,
-    '-map', '0:v:0', '-vf', FILTRO, '-c:v', 'rawvideo', '-f', 'nut', fotogramas,
+    '-map', '0:v:0', '-vf', filtro(fps), '-c:v', 'rawvideo', '-f', 'nut', fotogramas,
     ...(conAudio ? ['-map', '0:a:0', '-vn', '-ac', '1', '-c:a', 'libopus', '-b:a', '48k', ogg] : [])
   ])
   // Comprueba que salieron casi todos los fotogramas esperados
-  const esperados = Math.min(MAX_SEGUNDOS, segundosVideo || MAX_SEGUNDOS) * FPS
+  const esperados = duracion * fps
   const { size } = await fs.stat(fotogramas)
   if (size < esperados * BYTES_FOTOGRAMA * 0.8) throw new Error(`pocos fotogramas (${Math.round(size / BYTES_FOTOGRAMA)}/${esperados})`)
 
@@ -119,10 +124,11 @@ async function extraer(entrada, carpeta, segundosVideo) {
 }
 
 // Comprime a WebP animado; si pasa de 500 KB baja la calidad (sin volver a leer el video)
-async function comprimir(fotogramas, carpeta) {
+async function comprimir(fotogramas, carpeta, segundosVideo) {
   const webp = path.join(carpeta, 'sticker.webp')
+  const { calidades } = ajustes(Math.min(MAX_SEGUNDOS, segundosVideo || MAX_SEGUNDOS))
   let sticker = null
-  for (const calidad of [35, 15, 5]) {
+  for (const calidad of calidades) {
     await ejecutar(['-y', '-i', fotogramas, '-c:v', 'libwebp_anim', '-lossless', '0', '-q:v', String(calidad), '-compression_level', '0', '-loop', '0', webp])
     sticker = await fs.readFile(webp)
     if (sticker.length <= MAX_BYTES) break
@@ -163,7 +169,7 @@ export default {
       if (!audio) return avisar(sock, m, '❌ EL VIDEO NO TIENE SONIDO')
       console.log(`[s2] fotogramas y audio listos (${((Date.now() - inicio) / 1000).toFixed(1)}s)`)
 
-      const sticker = await comprimir(fotogramas, carpeta)
+      const sticker = await comprimir(fotogramas, carpeta, segundosVideo)
       console.log(`[s2] video ${video.seconds || '?'}s → sticker ${(sticker.length / 1024).toFixed(0)} KB, audio ${audio ? (audio.length / 1024).toFixed(0) + ' KB' : 'sin sonido'} (${((Date.now() - inicio) / 1000).toFixed(1)}s)`)
 
       const subir = { upload: sock.waUploadToServer }
