@@ -234,24 +234,32 @@
   // 15 fps para que se vea como video; la calidad baja solo si pasa del límite
   // Compresión nivel 2: ~35 % menos peso que el nivel 0 con la misma calidad (tarda ~1.5 veces más)
   // Fluidez preferida y alternativas: si el video es muy difícil, baja los fps antes que pixelar
-  const OPCIONES_FPS = [12, 10, 8]
+  // Tamaño y fluidez según la duración (como los bots fluidos): menos píxeles por cuadro = más cuadros en el mismo peso.
+  // En el chat casi no se nota la diferencia de tamaño, porque WhatsApp muestra los stickers pequeños.
+  const AJUSTES_DURACION = [
+    { hasta: 7, lado: 512, fps: [20, 15, 12] },
+    { hasta: 14, lado: 400, fps: [15, 12, 10] },
+    { hasta: Infinity, lado: 320, fps: [20, 15, 12] }
+  ]
+  let LADO = 512
+  let OPCIONES_FPS = [20, 15, 12]
   const CALIDAD_MINIMA = 35 // por debajo de esto se ve con bloques
   // Cuánto pesa el sticker con cada calidad, comparado con calidad 40 (medido con videos de prueba)
   const PESO_RELATIVO = [[60, 1.3], [50, 1.13], [40, 1], [30, 0.87], [25, 0.8], [20, 0.72], [15, 0.64], [10, 0.55], [5, 0.45], [1, 0.38]]
-  // area: escalado limpio; hqdn3d (ya en 512 px): quita el grano del video, que pesa mucho al comprimir
+  // area: escalado limpio; hqdn3d (ya reducido): quita el grano del video, que pesa mucho al comprimir
   // El recorte va en fracciones del video (0 a 1), así no importa su resolución ni si está girado
   const filtro = ({ x, y, w, h }) =>
     `crop=iw*${w.toFixed(4)}:ih*${h.toFixed(4)}:iw*${x.toFixed(4)}:ih*${y.toFixed(4)},` +
-    `fps=${OPCIONES_FPS[0]},scale=512:512:force_original_aspect_ratio=decrease:flags=area,hqdn3d=3:2:6:4,format=yuv420p`
-  // El relleno transparente hasta 512x512 se agrega al comprimir (así los fotogramas guardados ocupan mucho menos)
+    `fps=${OPCIONES_FPS[0]},scale=${LADO}:${LADO}:force_original_aspect_ratio=decrease:flags=area,hqdn3d=3:2:6:4,format=yuv420p`
+  // El relleno transparente hasta el cuadrado se agrega al comprimir (así los fotogramas guardados ocupan mucho menos)
   // Primero se activa la transparencia (yuva420p) y luego se rellena: al revés, el relleno sale negro
-  const RELLENO = 'format=yuva420p,pad=512:512:-1:-1:color=0x00000000'
+  const relleno = () => `format=yuva420p,pad=${LADO}:${LADO}:-1:-1:color=0x00000000`
 
   // Comprime a WebP animado desde los fotogramas ya preparados (no vuelve a leer el video)
   async function comprimir({ desde = 0, segundos, fps, calidad, salida }) {
     const codigo = await ffmpeg.exec([
       ...(desde > 0 ? ['-ss', desde.toFixed(2)] : []), ...(segundos ? ['-t', String(segundos)] : []), '-i', 'fotogramas.nut',
-      '-vf', fps < OPCIONES_FPS[0] ? `fps=${fps},${RELLENO}` : RELLENO,
+      '-vf', fps < OPCIONES_FPS[0] ? `fps=${fps},${relleno()}` : relleno(),
       '-c:v', 'libwebp_anim', '-lossless', '0', '-q:v', String(calidad), '-compression_level', '2', '-loop', '0', salida
     ])
     if (codigo !== 0) throw new Error('No se pudo hacer el sticker')
@@ -263,6 +271,9 @@
 
   async function hacerSticker(f, { inicio, duracion, recorte }) {
     const corte = ['-ss', inicio.toFixed(2), '-t', duracion.toFixed(2)]
+    const ajuste = AJUSTES_DURACION.find((a) => duracion <= a.hasta)
+    LADO = ajuste.lado
+    OPCIONES_FPS = ajuste.fps
     const nombre = 'entrada' + (f.name.match(/\.\w+$/)?.[0] || '.mp4')
     await ffmpeg.writeFile(nombre, new Uint8Array(await f.arrayBuffer()))
 
@@ -276,7 +287,7 @@
       if (audio.length < 200) audio = null
     }
 
-    // 2) Lee el video UNA sola vez: fotogramas ya en 512 px y sin grano
+    // 2) Lee el video UNA sola vez: fotogramas ya reducidos y sin grano
     mostrarEstado('Leyendo el video…')
     const alProgresar = ({ time }) => {
       if (time > 0) avance(((time / 1e6) / duracion) * 100)
@@ -326,7 +337,7 @@
       mostrarEstado(i === indice ? 'Haciendo el sticker…' : 'Ajustando el peso del sticker…')
       sticker = await comprimir({ fps, calidad: PESO_RELATIVO[i][0], salida: 'sticker.webp' })
       if (sticker.length <= MAX_BYTES) {
-        console.info(`[sticker] ${fps} fps, calidad ${PESO_RELATIVO[i][0]}, ${intentos} intento(s), ${Math.round(sticker.length / 1024)} KB`)
+        console.info(`[sticker] ${LADO}px, ${fps} fps, calidad ${PESO_RELATIVO[i][0]}, ${intentos} intento(s), ${Math.round(sticker.length / 1024)} KB`)
         break
       }
       // Si se pasó, salta a la calidad que debería caber según lo que pesó de verdad
