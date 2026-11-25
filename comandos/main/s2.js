@@ -10,7 +10,7 @@ const MAX_SEGUNDOS = 10
 const MAX_BYTES = 500 * 1024 // límite de tamaño de un sticker animado
 
 // Nombre del paquete y autor (texto gris) que muestra WhatsApp en el sticker
-const PAQUETE = '♦️ Erza-Bot-MD ♦️'
+const PAQUETE = '♦️ Erza-Bot-MD ♦️\n' // el salto de línea final manda el autor a la línea de abajo
 const AUTOR = 'mikelennn'
 
 const URL_CANAL = 'https://whatsapp.com/channel/0029Vb9eodxFsn0bzlsFDr0F'
