@@ -9,6 +9,10 @@ import { downloadContentFromMessage, prepareWAMessageMedia, generateWAMessageFro
 const MAX_SEGUNDOS = 10
 const MAX_BYTES = 500 * 1024 // límite de tamaño de un sticker animado
 
+// Nombre del paquete y autor (texto gris) que muestra WhatsApp en el sticker
+const PAQUETE = '♦️ Erza-Bot-Md ♦️\n            Stickers'
+const AUTOR = 'Mikelennn'
+
 const URL_CANAL = 'https://whatsapp.com/channel/0029Vb9eodxFsn0bzlsFDr0F'
 const FOOTER = '© Mikelennn\n© ErzaBot'
 
@@ -46,6 +50,50 @@ function ejecutar(args, limiteMs = 120000) {
       code === 0 ? resolve() : reject(new Error(err.trim().split('\n').slice(-2).join(' ') || `ffmpeg salió con ${code}`))
     })
   })
+}
+
+// Agrega a un WebP el bloque EXIF con el nombre del paquete y el autor (formato de stickers de WhatsApp)
+function ponerDatosSticker(webp, nombre, autor) {
+  const json = Buffer.from(
+    JSON.stringify({
+      'sticker-pack-id': 'erza-bot-md-stickers',
+      'sticker-pack-name': nombre,
+      'sticker-pack-publisher': autor,
+      emojis: ['♦️']
+    }),
+    'utf8'
+  )
+  // Cabecera TIFF con una sola entrada (etiqueta 0x5741) que apunta al JSON
+  const cabecera = Buffer.from([0x49, 0x49, 0x2a, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00, 0x41, 0x57, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x00])
+  cabecera.writeUInt32LE(json.length, 14)
+  const exif = Buffer.concat([cabecera, json])
+
+  if (webp.toString('ascii', 0, 4) !== 'RIFF' || webp.toString('ascii', 8, 12) !== 'WEBP') return webp
+
+  // Recorre los bloques: marca en VP8X que hay EXIF y quita un EXIF anterior si lo hubiera
+  const bloques = []
+  let i = 12
+  while (i + 8 <= webp.length) {
+    const tipo = webp.toString('ascii', i, i + 4)
+    const tam = webp.readUInt32LE(i + 4)
+    const fin = i + 8 + tam + (tam % 2)
+    let bloque = Buffer.from(webp.subarray(i, Math.min(fin, webp.length)))
+    if (tipo === 'VP8X') bloque[8] |= 0x08
+    if (tipo !== 'EXIF') bloques.push(bloque)
+    i = fin
+  }
+  if (!bloques.some((b) => b.toString('ascii', 0, 4) === 'VP8X')) return webp // solo WebP extendido (animado)
+
+  const tamExif = Buffer.alloc(4)
+  tamExif.writeUInt32LE(exif.length)
+  bloques.push(Buffer.concat([Buffer.from('EXIF'), tamExif, exif, exif.length % 2 ? Buffer.alloc(1) : Buffer.alloc(0)]))
+
+  const cuerpo = Buffer.concat(bloques)
+  const riff = Buffer.alloc(12)
+  riff.write('RIFF', 0, 'ascii')
+  riff.writeUInt32LE(cuerpo.length + 4, 4)
+  riff.write('WEBP', 8, 'ascii')
+  return Buffer.concat([riff, cuerpo])
 }
 
 // Busca el video: en el mensaje citado o en el propio mensaje
@@ -169,7 +217,7 @@ export default {
       if (!audio) return avisar(sock, m, '❌ EL VIDEO NO TIENE SONIDO')
       console.log(`[s2] fotogramas y audio listos (${((Date.now() - inicio) / 1000).toFixed(1)}s)`)
 
-      const sticker = await comprimir(fotogramas, carpeta, segundosVideo)
+      const sticker = ponerDatosSticker(await comprimir(fotogramas, carpeta, segundosVideo), PAQUETE, AUTOR)
       console.log(`[s2] video ${video.seconds || '?'}s → sticker ${(sticker.length / 1024).toFixed(0)} KB, audio ${audio ? (audio.length / 1024).toFixed(0) + ' KB' : 'sin sonido'} (${((Date.now() - inicio) / 1000).toFixed(1)}s)`)
 
       const subir = { upload: sock.waUploadToServer }
