@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erza-Bot Stickers</title>
+<style>
+  :root {
+    --fondo: #0d0708;
+    --tarjeta: #1a0e10;
+    --borde: #3a1a1e;
+    --rojo: #e0243a;
+    --rojo-claro: #ff5a6e;
+    --texto: #f6ecec;
+    --gris: #b49ea1;
+    --verde: #3ecf6e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at 50% -20%, #4a0f18 0%, var(--fondo) 60%);
+    color: var(--texto);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 24px 16px;
+  }
+  main { width: 100%; max-width: 440px; }
+  h1 { margin: 0; font-size: 1.6rem; text-align: center; letter-spacing: .02em; }
+  h1 span { color: var(--rojo-claro); }
+  .sub { text-align: center; color: var(--gris); margin: 6px 0 22px; font-size: .95rem; }
+  .tarjeta {
+    background: var(--tarjeta);
+    border: 1px solid var(--borde);
+    border-radius: 18px;
+    padding: 18px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, .4);
+  }
+  .destino { display: flex; align-items: center; gap: 8px; font-size: .92rem; color: var(--gris); margin-bottom: 14px; }
+  .punto { width: 9px; height: 9px; border-radius: 50%; background: var(--gris); flex: none; }
+  .punto.ok { background: var(--verde); box-shadow: 0 0 8px var(--verde); }
+  .destino b { color: var(--texto); }
+  label.zona {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    border: 2px dashed var(--borde); border-radius: 14px; padding: 26px 12px; cursor: pointer;
+    text-align: center; color: var(--gris); transition: border-color .2s, background .2s;
+  }
+  label.zona:hover { border-color: var(--rojo); background: rgba(224, 36, 58, .06); }
+  label.zona strong { color: var(--texto); font-size: 1.05rem; }
+  input[type=file] { display: none; }
+  video { width: 100%; max-height: 320px; border-radius: 12px; background: #000; margin-top: 14px; display: none; }
+  button {
+    width: 100%; margin-top: 14px; padding: 14px; border: 0; border-radius: 12px;
+    background: var(--rojo); color: #fff; font-size: 1.05rem; font-weight: 600; cursor: pointer;
+    transition: background .2s, opacity .2s;
+  }
+  button:hover:not(:disabled) { background: var(--rojo-claro); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .barra { height: 8px; background: var(--borde); border-radius: 99px; overflow: hidden; margin-top: 14px; display: none; }
+  .barra i { display: block; height: 100%; width: 0; background: var(--rojo); transition: width .2s; }
+  .barra.trabajando i { width: 40% !important; animation: vaiven 1.2s ease-in-out infinite; }
+  @keyframes vaiven { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
+  .estado { margin-top: 12px; min-height: 1.4em; text-align: center; font-size: .95rem; color: var(--gris); }
+  .estado.ok { color: var(--verde); }
+  .estado.error { color: var(--rojo-claro); }
+  .nota { color: var(--gris); font-size: .82rem; text-align: center; margin-top: 16px; line-height: 1.5; }
+  footer { text-align: center; color: var(--gris); font-size: .8rem; margin-top: 22px; }
+</style>
+</head>
+<body>
+<main>
+  <h1><span>♦️</span> Erza-Bot-MD <span>♦️</span></h1>
+  <p class="sub">Stickers con sonido desde un video</p>
+
+  <div class="tarjeta">
+    <div class="destino"><span class="punto" id="punto"></span><span id="destino">Conectando con el bot…</span></div>
+
+    <label class="zona" for="archivo">
+      <strong>🎬 Elige un video</strong>
+      <span id="nombre">Hasta 50 MB · se usan los primeros 10 segundos</span>
+    </label>
+    <input type="file" id="archivo" accept="video/*">
+    <video id="vista" controls playsinline muted></video>
+
+    <button id="enviar" disabled>Crear y enviar sticker</button>
+    <div class="barra" id="barra"><i id="progreso"></i></div>
+    <div class="estado" id="estado"></div>
+  </div>
+
+  <p class="nota">El sticker se crea con el sonido del video y se envía directo al grupo.<br>Puede tardar entre 20 y 40 segundos.</p>
+  <footer>© Mikelennn · © ErzaBot</footer>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id)
+  const archivo = $('archivo'), vista = $('vista'), enviar = $('enviar')
+  const barra = $('barra'), progreso = $('progreso'), estado = $('estado')
+  let conectado = false
+  let maxSegundos = 10
+
+  function mostrarEstado(texto, tipo = '') {
+    estado.textContent = texto
+    estado.className = 'estado ' + tipo
+  }
+
+  async function info() {
+    try {
+      const r = await fetch('/api/info', { cache: 'no-store' })
+      const d = await r.json()
+      conectado = d.conectado
+      maxSegundos = d.maxSegundos || 10
+      $('punto').classList.toggle('ok', conectado)
+      $('destino').innerHTML = conectado
+        ? 'Se enviará a <b></b>'
+        : 'El bot no está conectado ahora mismo'
+      if (conectado) $('destino').querySelector('b').textContent = d.grupo
+    } catch (e) {
+      conectado = false
+      $('destino').textContent = 'No se pudo contactar al bot'
+    }
+    enviar.disabled = !(conectado && archivo.files[0])
+  }
+
+  archivo.addEventListener('change', () => {
+    const f = archivo.files[0]
+    mostrarEstado('')
+    if (!f) return
+    if (!f.type.startsWith('video/')) { mostrarEstado('Ese archivo no es un video', 'error'); archivo.value = ''; return }
+    if (f.size > 50 * 1024 * 1024) { mostrarEstado('El video pesa más de 50 MB', 'error'); archivo.value = ''; return }
+    $('nombre').textContent = f.name
+    vista.src = URL.createObjectURL(f)
+    vista.style.display = 'block'
+    enviar.disabled = !conectado
+  })
+
+  function subir(f) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', '/api/subir')
+      xhr.setRequestHeader('Content-Type', f.type || 'video/mp4')
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) progreso.style.width = Math.round((e.loaded / e.total) * 100) + '%'
+      }
+      xhr.onload = () => {
+        let d = {}
+        try { d = JSON.parse(xhr.responseText) } catch (e) {}
+        xhr.status < 300 ? resolve(d) : reject(new Error(d.error || 'No se pudo subir el video'))
+      }
+      xhr.onerror = () => reject(new Error('Se perdió la conexión al subir'))
+      xhr.send(f)
+    })
+  }
+
+  async function seguir(id) {
+    while (true) {
+      await new Promise((r) => setTimeout(r, 2000))
+      let d
+      try {
+        d = await (await fetch('/api/estado?id=' + encodeURIComponent(id), { cache: 'no-store' })).json()
+      } catch (e) { continue }
+      if (d.error) throw new Error(d.error)
+      if (d.estado === 'listo') return d.mensaje
+      if (d.estado === 'error') throw new Error(d.mensaje)
+      mostrarEstado(d.mensaje)
+    }
+  }
+
+  enviar.addEventListener('click', async () => {
+    const f = archivo.files[0]
+    if (!f) return
+    enviar.disabled = true
+    archivo.disabled = true
+    barra.style.display = 'block'
+    barra.classList.remove('trabajando')
+    progreso.style.width = '0%'
+    mostrarEstado('Subiendo video…')
+    try {
+      const { id } = await subir(f)
+      barra.classList.add('trabajando')
+      mostrarEstado('En fila…')
+      const mensaje = await seguir(id)
+      mostrarEstado('✅ ' + mensaje, 'ok')
+    } catch (e) {
+      mostrarEstado('❌ ' + e.message, 'error')
+    } finally {
+      barra.style.display = 'none'
+      barra.classList.remove('trabajando')
+      archivo.disabled = false
+      enviar.disabled = !(conectado && archivo.files[0])
+    }
+  })
+
+  info()
+  setInterval(info, 15000)
+</script>
+</body>
+</html>

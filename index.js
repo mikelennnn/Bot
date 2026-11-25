@@ -9,6 +9,7 @@ import readline from 'readline'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
+import { iniciarWeb, actualizarConexion, prepararGrupo } from './lib/web.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const CARPETA_SESION = process.env.SESION_DIR || path.join(__dirname, 'sesion_bot')
@@ -101,6 +102,8 @@ async function iniciar() {
     if (connection === 'open') {
       console.log('✅ Bot conectado')
       cargarGruposIgnorados(sock)
+      actualizarConexion(sock)
+      prepararGrupo(sock)
     }
 
     if (connection === 'close') {
@@ -142,6 +145,7 @@ async function iniciar() {
   })
 }
 
+iniciarWeb()
 await cargarComandos(path.join(__dirname, 'comandos'))
 console.log(`Comandos cargados: ${[...new Set(comandos.values())].length}`)
 await iniciar()
