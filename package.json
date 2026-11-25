@@ -9,6 +9,8 @@
   "dependencies": {
     "@itsliaaa/baileys": "^0.5.6",
     "pino": "^9.0.0",
-    "ffmpeg-static": "^5.3.0"
+    "ffmpeg-static": "^5.3.0",
+    "@ffmpeg/ffmpeg": "0.12.15",
+    "@ffmpeg/core": "0.12.10"
   }
 }

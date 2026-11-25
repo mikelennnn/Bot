@@ -14,6 +14,7 @@
     --texto: #f6ecec;
     --gris: #b49ea1;
     --verde: #3ecf6e;
+    --amarillo: #ffc94d;
   }
   * { box-sizing: border-box; }
   body {
@@ -41,6 +42,7 @@
   .punto { width: 9px; height: 9px; border-radius: 50%; background: var(--gris); flex: none; }
   .punto.ok { background: var(--verde); box-shadow: 0 0 8px var(--verde); }
   .destino b { color: var(--texto); }
+  .fila { font-size: .82rem; color: var(--gris); margin-left: auto; white-space: nowrap; }
   label.zona {
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
     border: 2px dashed var(--borde); border-radius: 14px; padding: 26px 12px; cursor: pointer;
@@ -58,14 +60,16 @@
   button:hover:not(:disabled) { background: var(--rojo-claro); }
   button:disabled { opacity: .45; cursor: not-allowed; }
   .barra { height: 8px; background: var(--borde); border-radius: 99px; overflow: hidden; margin-top: 14px; display: none; }
-  .barra i { display: block; height: 100%; width: 0; background: var(--rojo); transition: width .2s; }
+  .barra i { display: block; height: 100%; width: 0; background: var(--rojo); transition: width .3s; }
   .barra.trabajando i { width: 40% !important; animation: vaiven 1.2s ease-in-out infinite; }
   @keyframes vaiven { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
+  .aviso {
+    display: none; margin-top: 14px; padding: 12px; border-radius: 12px; text-align: center; font-weight: 600;
+    background: rgba(255, 201, 77, .1); border: 1px solid rgba(255, 201, 77, .45); color: var(--amarillo);
+  }
   .estado { margin-top: 12px; min-height: 1.4em; text-align: center; font-size: .95rem; color: var(--gris); }
-  .estado.ok { color: var(--verde); }
+  .estado.ok { color: var(--verde); font-weight: 600; }
   .estado.error { color: var(--rojo-claro); }
-  .detalle { margin-top: 6px; text-align: center; font-size: .85rem; color: var(--gris); min-height: 1.2em; }
-  .fila { font-size: .82rem; color: var(--gris); margin-left: auto; white-space: nowrap; }
   .nota { color: var(--gris); font-size: .82rem; text-align: center; margin-top: 16px; line-height: 1.5; }
   footer { text-align: center; color: var(--gris); font-size: .8rem; margin-top: 22px; }
 </style>
@@ -80,85 +84,147 @@
 
     <label class="zona" for="archivo">
       <strong>🎬 Elige un video</strong>
-      <span id="nombre">Hasta 50 MB · se usan los primeros 10 segundos</span>
+      <span id="nombre">Se usan los primeros 10 segundos</span>
     </label>
     <input type="file" id="archivo" accept="video/*">
-    <video id="vista" controls playsinline muted></video>
+    <video id="vista" controls playsinline muted preload="metadata"></video>
 
     <button id="enviar" disabled>Crear y enviar sticker</button>
+    <div class="aviso" id="aviso">⚠️ No te salgas de la página: tu teléfono está haciendo el sticker</div>
     <div class="barra" id="barra"><i id="progreso"></i></div>
     <div class="estado" id="estado"></div>
-    <div class="detalle" id="detalle"></div>
   </div>
 
-  <p class="nota">El sticker se crea con el sonido del video y se envía directo al grupo.<br>Cuando termine de subir <b>ya puedes cerrar la página</b>: el sticker llegará solo.</p>
+  <p class="nota">El sticker lo hace <b>tu teléfono</b>, así no hay que esperar fila.<br>La primera vez se descarga el conversor (unos 30 MB), después ya queda guardado.</p>
   <footer>© Mikelennn · © ErzaBot</footer>
 </main>
 
-<script>
+<script type="module">
   const $ = (id) => document.getElementById(id)
   const archivo = $('archivo'), vista = $('vista'), enviar = $('enviar')
-  const barra = $('barra'), progreso = $('progreso'), estado = $('estado')
+  const barra = $('barra'), progreso = $('progreso'), estado = $('estado'), aviso = $('aviso')
+
+  const MAX_BYTES = 500 * 1024 // límite de WhatsApp para stickers animados
   let conectado = false
   let maxSegundos = 10
+  let trabajando = false
 
   function mostrarEstado(texto, tipo = '') {
     estado.textContent = texto
     estado.className = 'estado ' + tipo
   }
+  function avance(porcentaje) {
+    barra.classList.remove('trabajando')
+    progreso.style.width = Math.max(0, Math.min(100, porcentaje)) + '%'
+  }
+  function sinPorcentaje() {
+    barra.classList.add('trabajando')
+  }
 
+  // Avisa si intenta salir mientras el teléfono hace el sticker
+  window.addEventListener('beforeunload', (e) => {
+    if (!trabajando) return
+    e.preventDefault()
+    e.returnValue = ''
+  })
+
+  // ---------- Estado del bot ----------
   async function info() {
     try {
-      const r = await fetch('/api/info', { cache: 'no-store' })
-      const d = await r.json()
+      const d = await (await fetch('/api/info', { cache: 'no-store' })).json()
       conectado = d.conectado
       maxSegundos = d.maxSegundos || 10
       $('punto').classList.toggle('ok', conectado)
-      $('destino').innerHTML = conectado
-        ? 'Se enviará a <b></b>'
-        : 'El bot no está conectado ahora mismo'
+      $('destino').innerHTML = conectado ? 'Se enviará a <b></b>' : 'El bot no está conectado ahora mismo'
       if (conectado) $('destino').querySelector('b').textContent = d.grupo
-      $('fila').textContent = d.enFila ? `${d.enFila} en fila` : ''
+      $('fila').textContent = d.enFila ? `${d.enFila} enviándose` : ''
     } catch (e) {
       conectado = false
       $('destino').textContent = 'No se pudo contactar al bot'
     }
-    enviar.disabled = !(conectado && archivo.files[0])
+    if (!trabajando) enviar.disabled = !(conectado && archivo.files[0])
   }
 
-  archivo.addEventListener('change', () => {
-    const f = archivo.files[0]
-    mostrarEstado('')
-    if (!f) return
-    if (!f.type.startsWith('video/')) { mostrarEstado('Ese archivo no es un video', 'error'); archivo.value = ''; return }
-    if (f.size > 50 * 1024 * 1024) { mostrarEstado('El video pesa más de 50 MB', 'error'); archivo.value = ''; return }
-    $('nombre').textContent = f.name
-    vista.src = URL.createObjectURL(f)
-    vista.style.display = 'block'
-    enviar.disabled = !conectado
-  })
+  // ---------- Conversor (ffmpeg.wasm, servido desde este mismo sitio) ----------
+  let ffmpeg = null
+  let cargando = null
+  function cargarConversor() {
+    if (!cargando) {
+      cargando = (async () => {
+        const { FFmpeg } = await import('/ffmpeg/ffmpeg/index.js')
+        const f = new FFmpeg()
+        await f.load({ coreURL: '/ffmpeg/core/ffmpeg-core.js', wasmURL: '/ffmpeg/core/ffmpeg-core.wasm' })
+        ffmpeg = f
+        return f
+      })()
+      cargando.catch(() => (cargando = null))
+    }
+    return cargando
+  }
 
-  function subir(f) {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest()
-      xhr.open('POST', '/api/subir')
-      xhr.setRequestHeader('Content-Type', f.type || 'video/mp4')
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) progreso.style.width = Math.round((e.loaded / e.total) * 100) + '%'
+  // Mismos ajustes que usaba el bot: hasta 5 s → 8 fps; más largos → 6 fps y más compresión
+  const ajustes = (s) => (s > 5 ? { fps: 6, calidades: [15, 5, 1] } : { fps: 8, calidades: [35, 15, 5] })
+  const filtro = (fps) =>
+    `fps=${fps},scale=512:512:force_original_aspect_ratio=decrease:flags=fast_bilinear,pad=512:512:-1:-1:color=0x00000000,format=yuva420p`
+
+  async function hacerSticker(f, segundosVideo) {
+    const duracion = Math.min(maxSegundos, segundosVideo || maxSegundos)
+    const { fps, calidades } = ajustes(duracion)
+    const nombre = 'entrada' + (f.name.match(/\.\w+$/)?.[0] || '.mp4')
+    await ffmpeg.writeFile(nombre, new Uint8Array(await f.arrayBuffer()))
+
+    // Avance de la conversión según el tiempo procesado
+    const alProgresar = ({ time }) => {
+      if (time > 0) avance(((time / 1e6) / duracion) * 100)
+    }
+    ffmpeg.on('progress', alProgresar)
+
+    let sticker = null
+    try {
+      for (const [i, calidad] of calidades.entries()) {
+        mostrarEstado(i === 0 ? 'Haciendo el sticker…' : 'Ajustando el peso del sticker…')
+        avance(0)
+        const codigo = await ffmpeg.exec([
+          '-t', String(maxSegundos), '-i', nombre, '-an', '-vf', filtro(fps),
+          '-c:v', 'libwebp_anim', '-lossless', '0', '-q:v', String(calidad), '-compression_level', '0', '-loop', '0', 'sticker.webp'
+        ])
+        if (codigo !== 0) throw new Error('No se pudo leer ese video')
+        sticker = await ffmpeg.readFile('sticker.webp')
+        if (sticker.length <= MAX_BYTES) break
       }
-      xhr.onload = () => {
-        let d = {}
-        try { d = JSON.parse(xhr.responseText) } catch (e) {}
-        xhr.status < 300 ? resolve(d) : reject(new Error(d.error || 'No se pudo subir el video'))
-      }
-      xhr.onerror = () => reject(new Error('Se perdió la conexión al subir'))
-      xhr.send(f)
+    } finally {
+      ffmpeg.off('progress', alProgresar)
+    }
+
+    // Audio (si el video no tiene sonido, el sticker va sin audio)
+    mostrarEstado('Sacando el sonido…')
+    sinPorcentaje()
+    let audio = null
+    const codigoAudio = await ffmpeg.exec(['-t', String(maxSegundos), '-i', nombre, '-vn', '-map', '0:a:0', '-ac', '1', '-c:a', 'libopus', '-b:a', '48k', 'audio.ogg'])
+    if (codigoAudio === 0) {
+      audio = await ffmpeg.readFile('audio.ogg')
+      if (audio.length < 200) audio = null
+    }
+
+    for (const n of [nombre, 'sticker.webp', 'audio.ogg']) await ffmpeg.deleteFile(n).catch(() => {})
+    return { sticker, audio, segundos: duracion }
+  }
+
+  // ---------- Enviar al bot y esperar a que llegue al grupo ----------
+  async function mandar({ sticker, audio, segundos }) {
+    const r = await fetch('/api/sticker', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream', 'X-Tam-Sticker': String(sticker.length), 'X-Segundos': String(segundos) },
+      body: new Blob(audio ? [sticker, audio] : [sticker])
     })
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error(d.error || 'No se pudo mandar el sticker al bot')
+    return d.id
   }
 
-  async function seguir(id) {
+  async function esperarEnvio(id) {
     while (true) {
-      await new Promise((r) => setTimeout(r, 2000))
+      await new Promise((r) => setTimeout(r, 1500))
       let d
       try {
         d = await (await fetch('/api/estado?id=' + encodeURIComponent(id), { cache: 'no-store' })).json()
@@ -166,37 +232,70 @@
       if (d.error) throw new Error(d.error)
       if (d.estado === 'listo') return d.mensaje
       if (d.estado === 'error') throw new Error(d.mensaje)
-      $('detalle').textContent = d.mensaje
+      mostrarEstado(d.antes > 0 ? `Sticker listo, esperando turno para mandarse (${d.antes} antes)…` : 'Mandando tu sticker al grupo…')
     }
+  }
+
+  // ---------- Interfaz ----------
+  archivo.addEventListener('change', () => {
+    const f = archivo.files[0]
+    mostrarEstado('')
+    if (!f) return
+    if (!f.type.startsWith('video/')) { mostrarEstado('Ese archivo no es un video', 'error'); archivo.value = ''; return }
+    $('nombre').textContent = f.name
+    vista.src = URL.createObjectURL(f)
+    vista.style.display = 'block'
+    enviar.disabled = !conectado
+    cargarConversor().catch(() => {}) // empieza a descargar el conversor mientras eligen
+  })
+
+  function duracionDelVideo() {
+    if (Number.isFinite(vista.duration) && vista.duration > 0) return Promise.resolve(vista.duration)
+    return new Promise((resolve) => {
+      vista.addEventListener('loadedmetadata', () => resolve(Number.isFinite(vista.duration) ? vista.duration : 0), { once: true })
+      setTimeout(() => resolve(0), 3000)
+    })
   }
 
   enviar.addEventListener('click', async () => {
     const f = archivo.files[0]
     if (!f) return
+    trabajando = true
     enviar.disabled = true
     archivo.disabled = true
+    aviso.style.display = 'block'
     barra.style.display = 'block'
-    barra.classList.remove('trabajando')
-    progreso.style.width = '0%'
-    mostrarEstado('Subiendo video…')
-    $('detalle').textContent = ''
     try {
-      const { id, posicion } = await subir(f)
-      barra.classList.add('trabajando')
-      mostrarEstado(`✅ Video recibido${posicion ? ` (lugar ${posicion} en la fila)` : ''}. Ya puedes salir: el sticker llegará solo al grupo.`, 'ok')
-      archivo.disabled = false
-      enviar.disabled = !conectado
+      if (!ffmpeg) {
+        mostrarEstado('Preparando el conversor (solo la primera vez)…')
+        sinPorcentaje()
+        try {
+          await cargarConversor()
+        } catch (e) {
+          throw new Error('Tu teléfono o navegador no puede hacer stickers aquí')
+        }
+      }
+      const resultado = await hacerSticker(f, await duracionDelVideo())
+
+      mostrarEstado('Mandando el sticker al bot…')
+      sinPorcentaje()
+      const id = await mandar(resultado)
+
+      // Ya está en el bot: aunque se salga, se manda igual
+      trabajando = false
+      aviso.style.display = 'none'
+      const mensaje = await esperarEnvio(id)
+      mostrarEstado('✅ ' + mensaje, 'ok')
       archivo.value = ''
       vista.style.display = 'none'
-      $('nombre').textContent = 'Puedes subir otro video'
-      const mensaje = await seguir(id)
-      $('detalle').textContent = '✅ ' + mensaje
+      $('nombre').textContent = 'Puedes hacer otro sticker'
     } catch (e) {
-      mostrarEstado('❌ ' + e.message, 'error')
-      $('detalle').textContent = ''
+      const texto = /memory|abort|RuntimeError/i.test(String(e?.message)) ? 'Tu teléfono no pudo hacer el sticker con ese video' : e.message
+      mostrarEstado('❌ ' + texto, 'error')
     } finally {
+      trabajando = false
+      aviso.style.display = 'none'
       barra.style.display = 'none'
-      barra.classList.remove('trabajando')
       archivo.disabled = false
       enviar.disabled = !(conectado && archivo.files[0])
     }
