@@ -64,6 +64,8 @@
   .estado { margin-top: 12px; min-height: 1.4em; text-align: center; font-size: .95rem; color: var(--gris); }
   .estado.ok { color: var(--verde); }
   .estado.error { color: var(--rojo-claro); }
+  .detalle { margin-top: 6px; text-align: center; font-size: .85rem; color: var(--gris); min-height: 1.2em; }
+  .fila { font-size: .82rem; color: var(--gris); margin-left: auto; white-space: nowrap; }
   .nota { color: var(--gris); font-size: .82rem; text-align: center; margin-top: 16px; line-height: 1.5; }
   footer { text-align: center; color: var(--gris); font-size: .8rem; margin-top: 22px; }
 </style>
@@ -74,7 +76,7 @@
   <p class="sub">Stickers con sonido desde un video</p>
 
   <div class="tarjeta">
-    <div class="destino"><span class="punto" id="punto"></span><span id="destino">Conectando con el bot…</span></div>
+    <div class="destino"><span class="punto" id="punto"></span><span id="destino">Conectando con el bot…</span><span class="fila" id="fila"></span></div>
 
     <label class="zona" for="archivo">
       <strong>🎬 Elige un video</strong>
@@ -86,9 +88,10 @@
     <button id="enviar" disabled>Crear y enviar sticker</button>
     <div class="barra" id="barra"><i id="progreso"></i></div>
     <div class="estado" id="estado"></div>
+    <div class="detalle" id="detalle"></div>
   </div>
 
-  <p class="nota">El sticker se crea con el sonido del video y se envía directo al grupo.<br>Puede tardar entre 20 y 40 segundos.</p>
+  <p class="nota">El sticker se crea con el sonido del video y se envía directo al grupo.<br>Cuando termine de subir <b>ya puedes cerrar la página</b>: el sticker llegará solo.</p>
   <footer>© Mikelennn · © ErzaBot</footer>
 </main>
 
@@ -115,6 +118,7 @@
         ? 'Se enviará a <b></b>'
         : 'El bot no está conectado ahora mismo'
       if (conectado) $('destino').querySelector('b').textContent = d.grupo
+      $('fila').textContent = d.enFila ? `${d.enFila} en fila` : ''
     } catch (e) {
       conectado = false
       $('destino').textContent = 'No se pudo contactar al bot'
@@ -162,7 +166,7 @@
       if (d.error) throw new Error(d.error)
       if (d.estado === 'listo') return d.mensaje
       if (d.estado === 'error') throw new Error(d.mensaje)
-      mostrarEstado(d.mensaje)
+      $('detalle').textContent = d.mensaje
     }
   }
 
@@ -175,14 +179,21 @@
     barra.classList.remove('trabajando')
     progreso.style.width = '0%'
     mostrarEstado('Subiendo video…')
+    $('detalle').textContent = ''
     try {
-      const { id } = await subir(f)
+      const { id, posicion } = await subir(f)
       barra.classList.add('trabajando')
-      mostrarEstado('En fila…')
+      mostrarEstado(`✅ Video recibido${posicion ? ` (lugar ${posicion} en la fila)` : ''}. Ya puedes salir: el sticker llegará solo al grupo.`, 'ok')
+      archivo.disabled = false
+      enviar.disabled = !conectado
+      archivo.value = ''
+      vista.style.display = 'none'
+      $('nombre').textContent = 'Puedes subir otro video'
       const mensaje = await seguir(id)
-      mostrarEstado('✅ ' + mensaje, 'ok')
+      $('detalle').textContent = '✅ ' + mensaje
     } catch (e) {
       mostrarEstado('❌ ' + e.message, 'error')
+      $('detalle').textContent = ''
     } finally {
       barra.style.display = 'none'
       barra.classList.remove('trabajando')
