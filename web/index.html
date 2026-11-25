@@ -84,7 +84,7 @@
 
     <label class="zona" for="archivo">
       <strong>🎬 Elige un video</strong>
-      <span id="nombre">Se usan los primeros 10 segundos</span>
+      <span id="nombre">Se usan los primeros 5 segundos</span>
     </label>
     <input type="file" id="archivo" accept="video/*">
     <video id="vista" controls playsinline muted preload="metadata"></video>
@@ -106,7 +106,8 @@
 
   const MAX_BYTES = 500 * 1024 // límite de WhatsApp para stickers animados
   let conectado = false
-  let maxSegundos = 10
+  // 5 segundos a 15 fps: se ve como video y cabe en los 500 KB de WhatsApp
+  const maxSegundos = 5
   let trabajando = false
 
   function mostrarEstado(texto, tipo = '') {
@@ -133,7 +134,6 @@
     try {
       const d = await (await fetch('/api/info', { cache: 'no-store' })).json()
       conectado = d.conectado
-      maxSegundos = d.maxSegundos || 10
       $('punto').classList.toggle('ok', conectado)
       $('destino').innerHTML = conectado ? 'Se enviará a <b></b>' : 'El bot no está conectado ahora mismo'
       if (conectado) $('destino').querySelector('b').textContent = d.grupo
@@ -183,8 +183,8 @@
     return cargando
   }
 
-  // Mismos ajustes que usaba el bot: hasta 5 s → 8 fps; más largos → 6 fps y más compresión
-  const ajustes = (s) => (s > 5 ? { fps: 6, calidades: [15, 5, 1] } : { fps: 8, calidades: [35, 15, 5] })
+  // Página: 5 s a 15 fps (se ve fluido). Calidad empieza alta y baja solo si pasa de 500 KB
+  const ajustes = () => ({ fps: 15, calidades: [40, 25, 15, 5] })
   const filtro = (fps) =>
     `fps=${fps},scale=512:512:force_original_aspect_ratio=decrease:flags=fast_bilinear,pad=512:512:-1:-1:color=0x00000000,format=yuva420p`
 
