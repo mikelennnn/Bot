@@ -104,7 +104,8 @@
   const archivo = $('archivo'), vista = $('vista'), enviar = $('enviar')
   const barra = $('barra'), progreso = $('progreso'), estado = $('estado'), aviso = $('aviso')
 
-  const MAX_BYTES = 500 * 1024 // límite de WhatsApp para stickers animados
+  // PRUEBA: hasta 1 MB (las reglas de paquetes dicen 500 KB; probamos si WhatsApp acepta más)
+  const MAX_BYTES = 1000 * 1024
   let conectado = false
   let maxSegundos = 10
   let trabajando = false
@@ -183,8 +184,8 @@
     return cargando
   }
 
-  // Mismos ajustes que usaba el bot: hasta 5 s → 8 fps; más largos → 6 fps y más compresión
-  const ajustes = (s) => (s > 5 ? { fps: 6, calidades: [15, 5, 1] } : { fps: 8, calidades: [35, 15, 5] })
+  // 15 fps para que se vea como video; la calidad baja solo si pasa del límite
+  const ajustes = () => ({ fps: 15, calidades: [40, 25, 15, 5] })
   const filtro = (fps) =>
     `fps=${fps},scale=512:512:force_original_aspect_ratio=decrease:flags=fast_bilinear,pad=512:512:-1:-1:color=0x00000000,format=yuva420p`
 
