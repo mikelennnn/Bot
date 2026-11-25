@@ -242,7 +242,8 @@
   // El recorte va en fracciones del video (0 a 1), así no importa su resolución ni si está girado
   const filtro = ({ x, y, w, h }) =>
     `crop=iw*${w.toFixed(4)}:ih*${h.toFixed(4)}:iw*${x.toFixed(4)}:ih*${y.toFixed(4)},` +
-    `fps=${OPCIONES_FPS[0]},scale=512:512:force_original_aspect_ratio=decrease:flags=area,hqdn3d=3:2:6:4,format=yuv420p`
+    // start_time=0: imagen y audio empiezan en el mismo cero (si la imagen empieza tarde, repite el primer cuadro)
+    `fps=${OPCIONES_FPS[0]}:start_time=0,scale=512:512:force_original_aspect_ratio=decrease:flags=area,hqdn3d=3:2:6:4,format=yuv420p`
   // El relleno transparente hasta 512x512 se agrega al comprimir (así los fotogramas guardados ocupan mucho menos)
   // Primero se activa la transparencia (yuva420p) y luego se rellena: al revés, el relleno sale negro
   const RELLENO = 'format=yuva420p,pad=512:512:-1:-1:color=0x00000000'
@@ -270,7 +271,9 @@
     mostrarEstado('Sacando el sonido…')
     sinPorcentaje()
     let audio = null
-    const codigoAudio = await ffmpeg.exec([...corte, '-i', nombre, '-vn', '-map', '0:a:0', '-ac', '1', '-c:a', 'libopus', '-b:a', '48k', 'audio.ogg'])
+    // aresample first_pts=0: si el audio empieza tarde en el archivo, pone silencio al inicio (no lo adelanta)
+    const codigoAudio = await ffmpeg.exec([...corte, '-i', nombre, '-vn', '-map', '0:a:0', '-af', 'aresample=async=1:first_pts=0,apad',
+      '-t', duracion.toFixed(2), '-ac', '1', '-c:a', 'libopus', '-b:a', '48k', 'audio.ogg'])
     if (codigoAudio === 0) {
       audio = await ffmpeg.readFile('audio.ogg')
       if (audio.length < 200) audio = null
@@ -284,7 +287,7 @@
     ffmpeg.on('progress', alProgresar)
     let codigo
     try {
-      codigo = await ffmpeg.exec([...corte, '-i', nombre, '-an', '-vf', filtro(recorte), '-c:v', 'rawvideo', '-f', 'nut', 'fotogramas.nut'])
+      codigo = await ffmpeg.exec([...corte, '-i', nombre, '-an', '-vf', filtro(recorte), '-t', duracion.toFixed(2), '-c:v', 'rawvideo', '-f', 'nut', 'fotogramas.nut'])
     } finally {
       ffmpeg.off('progress', alProgresar)
     }
