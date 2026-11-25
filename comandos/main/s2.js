@@ -28,12 +28,23 @@ function avisar(sock, m, estado) {
   )
 }
 
-function ejecutar(args) {
+function ejecutar(args, limiteMs = 120000) {
   return new Promise((resolve, reject) => {
-    const p = spawn(ffmpeg, args, { stdio: ['ignore', 'ignore', 'pipe'] })
+    const p = spawn(ffmpeg, ['-hide_banner', '-loglevel', 'error', '-threads', '1', ...args], { stdio: ['ignore', 'ignore', 'pipe'] })
     let err = ''
+    const reloj = setTimeout(() => {
+      p.kill('SIGKILL')
+      reject(new Error('ffmpeg tardó demasiado'))
+    }, limiteMs)
     p.stderr.on('data', (d) => (err += d))
-    p.on('close', (code) => (code === 0 ? resolve() : reject(new Error(err.split('\n').slice(-3).join(' ')))))
+    p.on('error', (e) => {
+      clearTimeout(reloj)
+      reject(e)
+    })
+    p.on('close', (code) => {
+      clearTimeout(reloj)
+      code === 0 ? resolve() : reject(new Error(err.trim().split('\n').slice(-2).join(' ') || `ffmpeg salió con ${code}`))
+    })
   })
 }
 
@@ -61,19 +72,19 @@ async function convertir(entrada, carpeta) {
   const webp = path.join(carpeta, 'sticker.webp')
   const ogg = path.join(carpeta, 'audio.ogg')
 
-  // Sticker animado 512x512 con fondo transparente; si pesa mucho, baja calidad y fps
+  // Sticker animado 512x512 con fondo transparente. Optimizado para poco CPU:
+  // solo lee los primeros segundos, un hilo y compresión rápida. Si pesa mucho, baja calidad.
   const intentos = [
-    [15, 60],
-    [12, 40],
+    [12, 45],
     [10, 25],
-    [8, 15]
+    [8, 10]
   ]
   let sticker = null
   for (const [fps, calidad] of intentos) {
     await ejecutar([
-      '-y', '-i', entrada, '-t', String(MAX_SEGUNDOS), '-an',
-      '-vf', `fps=${fps},scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:-1:-1:color=0x00000000`,
-      '-c:v', 'libwebp_anim', '-lossless', '0', '-q:v', String(calidad), '-loop', '0', '-preset', 'default',
+      '-y', '-t', String(MAX_SEGUNDOS), '-i', entrada, '-an',
+      '-vf', `fps=${fps},scale=512:512:force_original_aspect_ratio=decrease:flags=fast_bilinear,pad=512:512:-1:-1:color=0x00000000`,
+      '-c:v', 'libwebp_anim', '-lossless', '0', '-q:v', String(calidad), '-compression_level', '0', '-loop', '0',
       webp
     ])
     sticker = await fs.readFile(webp)
@@ -82,7 +93,7 @@ async function convertir(entrada, carpeta) {
 
   let audio = null
   try {
-    await ejecutar(['-y', '-i', entrada, '-t', String(MAX_SEGUNDOS), '-vn', '-ac', '1', '-c:a', 'libopus', '-b:a', '64k', ogg])
+    await ejecutar(['-y', '-t', String(MAX_SEGUNDOS), '-i', entrada, '-vn', '-ac', '1', '-c:a', 'libopus', '-b:a', '64k', ogg])
     audio = await fs.readFile(ogg)
     if (audio.length < 200) audio = null // el video no tenía sonido
   } catch (e) {
@@ -99,11 +110,14 @@ export default {
     const video = buscarVideo(m)
     if (!video) return avisar(sock, m, '❌ RESPONDE A UN VIDEO CON #s2')
 
+    const inicio = Date.now()
+    console.log(`[s2] descargando video de ${video.seconds || '?'}s`)
     const carpeta = await fs.mkdtemp(path.join(os.tmpdir(), 's2-'))
     try {
       const entrada = path.join(carpeta, 'video.mp4')
       await fs.writeFile(entrada, await descargar(video))
 
+      console.log(`[s2] convirtiendo (${((Date.now() - inicio) / 1000).toFixed(1)}s)`)
       const { sticker, audio } = await convertir(entrada, carpeta)
       console.log(`[s2] video ${video.seconds || '?'}s → sticker ${(sticker.length / 1024).toFixed(0)} KB, audio ${audio ? (audio.length / 1024).toFixed(0) + ' KB' : 'sin sonido'}`)
       if (!audio) return avisar(sock, m, '❌ EL VIDEO NO TIENE SONIDO')
@@ -126,7 +140,10 @@ export default {
       }
       const msg = generateWAMessageFromContent(jid, contenido, { quoted: m, userJid: sock.user.id })
       await sock.relayMessage(jid, msg.message, { messageId: msg.key.id })
-      console.log(`[s2] sticker enviado (${msg.key.id})`)
+      console.log(`[s2] sticker enviado en ${((Date.now() - inicio) / 1000).toFixed(1)}s`)
+    } catch (e) {
+      console.log('[s2] error:', e?.message || e)
+      await avisar(sock, m, '❌ NO SE PUDO CREAR EL STICKER')
     } finally {
       fs.rm(carpeta, { recursive: true, force: true }).catch(() => {})
     }
