@@ -124,6 +124,7 @@ async function iniciar() {
       if (codigo === DisconnectReason.loggedOut) {
         console.log('Sesión cerrada. Borrando sesión para vincular de nuevo...')
         fs.rmSync(CARPETA_SESION, { recursive: true, force: true })
+        llavesEnMemoria = null // sesión nueva: llaves nuevas
       }
       setTimeout(iniciar, 3000)
     }
