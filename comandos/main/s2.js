@@ -61,45 +61,73 @@ function buscarVideo(m) {
   return null
 }
 
-async function descargar(video) {
-  const stream = await downloadContentFromMessage(video, 'video')
+// Descarga el video. Con "parcial" baja solo el principio (lo justo para los primeros segundos),
+// que es mucho más rápido en videos largos.
+async function descargar(video, parcial) {
+  const total = Number(video.fileLength) || 0
+  const segundos = Number(video.seconds) || 0
+  const opciones = {}
+  if (parcial && total && segundos > MAX_SEGUNDOS + 2) {
+    const necesario = Math.ceil((total * (MAX_SEGUNDOS + 2)) / segundos) + 512 * 1024
+    if (necesario < total) opciones.endByte = necesario
+  }
+  const stream = await downloadContentFromMessage(video, 'video', opciones)
   const partes = []
   for await (const parte of stream) partes.push(parte)
-  return Buffer.concat(partes)
+  return { buffer: Buffer.concat(partes), parcial: !!opciones.endByte }
 }
 
-async function convertir(entrada, carpeta) {
-  const webp = path.join(carpeta, 'sticker.webp')
-  const ogg = path.join(carpeta, 'audio.ogg')
+const FPS = 8 // menos fotogramas = mucho más rápido y el sticker cabe en 500 KB al primer intento
+const FILTRO = `fps=${FPS},scale=512:512:force_original_aspect_ratio=decrease:flags=fast_bilinear,pad=512:512:-1:-1:color=0x00000000,format=yuva420p`
+const BYTES_FOTOGRAMA = 512 * 512 * 2.5 // yuva420p
 
-  // Sticker animado 512x512 con fondo transparente. Optimizado para poco CPU:
-  // solo lee los primeros segundos, un hilo y compresión rápida. Si pesa mucho, baja calidad.
-  const intentos = [
-    [12, 45],
-    [10, 25],
-    [8, 10]
-  ]
+// Mira qué pistas tiene el archivo (ffmpeg -i sin salida termina con error, pero lista las pistas)
+function pistas(entrada) {
+  return new Promise((resolve) => {
+    const p = spawn(ffmpeg, ['-hide_banner', '-i', entrada], { stdio: ['ignore', 'ignore', 'pipe'] })
+    let info = ''
+    p.stderr.on('data', (d) => (info += d))
+    p.on('error', () => resolve({ video: false, audio: false }))
+    p.on('close', () => resolve({ video: /Stream #.*Video:/.test(info), audio: /Stream #.*Audio:/.test(info) }))
+  })
+}
+
+// Lee el video UNA sola vez: saca los fotogramas ya escalados y el audio
+async function extraer(entrada, carpeta, segundosVideo) {
+  const fotogramas = path.join(carpeta, 'fotogramas.nut')
+  const ogg = path.join(carpeta, 'audio.ogg')
+  const { video, audio: conAudio } = await pistas(entrada)
+  if (!video) throw new Error('no se pudo leer el video')
+  await ejecutar([
+    '-y', '-skip_loop_filter', 'all', '-flags2', '+fast', '-t', String(MAX_SEGUNDOS), '-i', entrada,
+    '-map', '0:v:0', '-vf', FILTRO, '-c:v', 'rawvideo', '-f', 'nut', fotogramas,
+    ...(conAudio ? ['-map', '0:a:0', '-vn', '-ac', '1', '-c:a', 'libopus', '-b:a', '48k', ogg] : [])
+  ])
+  // Comprueba que salieron casi todos los fotogramas esperados
+  const esperados = Math.min(MAX_SEGUNDOS, segundosVideo || MAX_SEGUNDOS) * FPS
+  const { size } = await fs.stat(fotogramas)
+  if (size < esperados * BYTES_FOTOGRAMA * 0.8) throw new Error(`pocos fotogramas (${Math.round(size / BYTES_FOTOGRAMA)}/${esperados})`)
+
+  let audio = null
+  if (conAudio) {
+    try {
+      audio = await fs.readFile(ogg)
+      if (audio.length < 200) audio = null
+    } catch (e) {}
+  }
+  return { fotogramas, audio }
+}
+
+// Comprime a WebP animado; si pasa de 500 KB baja la calidad (sin volver a leer el video)
+async function comprimir(fotogramas, carpeta) {
+  const webp = path.join(carpeta, 'sticker.webp')
   let sticker = null
-  for (const [fps, calidad] of intentos) {
-    await ejecutar([
-      '-y', '-t', String(MAX_SEGUNDOS), '-i', entrada, '-an',
-      '-vf', `fps=${fps},scale=512:512:force_original_aspect_ratio=decrease:flags=fast_bilinear,pad=512:512:-1:-1:color=0x00000000`,
-      '-c:v', 'libwebp_anim', '-lossless', '0', '-q:v', String(calidad), '-compression_level', '0', '-loop', '0',
-      webp
-    ])
+  for (const calidad of [35, 15, 5]) {
+    await ejecutar(['-y', '-i', fotogramas, '-c:v', 'libwebp_anim', '-lossless', '0', '-q:v', String(calidad), '-compression_level', '0', '-loop', '0', webp])
     sticker = await fs.readFile(webp)
     if (sticker.length <= MAX_BYTES) break
   }
-
-  let audio = null
-  try {
-    await ejecutar(['-y', '-t', String(MAX_SEGUNDOS), '-i', entrada, '-vn', '-ac', '1', '-c:a', 'libopus', '-b:a', '64k', ogg])
-    audio = await fs.readFile(ogg)
-    if (audio.length < 200) audio = null // el video no tenía sonido
-  } catch (e) {
-    audio = null
-  }
-  return { sticker, audio }
+  return sticker
 }
 
 export default {
@@ -111,23 +139,38 @@ export default {
     if (!video) return avisar(sock, m, '❌ RESPONDE A UN VIDEO CON #s2')
 
     const inicio = Date.now()
-    console.log(`[s2] descargando video de ${video.seconds || '?'}s`)
+    console.log(`[s2] inicio: video de ${video.seconds || '?'}s`)
     const carpeta = await fs.mkdtemp(path.join(os.tmpdir(), 's2-'))
     try {
       const entrada = path.join(carpeta, 'video.mp4')
-      await fs.writeFile(entrada, await descargar(video))
+      const segundosVideo = Number(video.seconds) || 0
 
-      console.log(`[s2] convirtiendo (${((Date.now() - inicio) / 1000).toFixed(1)}s)`)
-      const { sticker, audio } = await convertir(entrada, carpeta)
-      console.log(`[s2] video ${video.seconds || '?'}s → sticker ${(sticker.length / 1024).toFixed(0)} KB, audio ${audio ? (audio.length / 1024).toFixed(0) + ' KB' : 'sin sonido'}`)
+      // 1) Intenta con solo el principio del video; si no sirve, baja el video completo
+      let datos
+      let descarga = await descargar(video, true)
+      await fs.writeFile(entrada, descarga.buffer)
+      console.log(`[s2] descargado ${(descarga.buffer.length / 1024).toFixed(0)} KB${descarga.parcial ? ' (parcial)' : ''} (${((Date.now() - inicio) / 1000).toFixed(1)}s)`)
+      try {
+        datos = await extraer(entrada, carpeta, segundosVideo)
+      } catch (e) {
+        if (!descarga.parcial) throw e
+        console.log('[s2] la descarga parcial no alcanzó, bajando el video completo:', e?.message || e)
+        descarga = await descargar(video, false)
+        await fs.writeFile(entrada, descarga.buffer)
+        datos = await extraer(entrada, carpeta, segundosVideo)
+      }
+      const { fotogramas, audio } = datos
       if (!audio) return avisar(sock, m, '❌ EL VIDEO NO TIENE SONIDO')
+      console.log(`[s2] fotogramas y audio listos (${((Date.now() - inicio) / 1000).toFixed(1)}s)`)
+
+      const sticker = await comprimir(fotogramas, carpeta)
+      console.log(`[s2] video ${video.seconds || '?'}s → sticker ${(sticker.length / 1024).toFixed(0)} KB, audio ${audio ? (audio.length / 1024).toFixed(0) + ' KB' : 'sin sonido'} (${((Date.now() - inicio) / 1000).toFixed(1)}s)`)
 
       const subir = { upload: sock.waUploadToServer }
-      const { stickerMessage } = await prepareWAMessageMedia({ sticker, mimetype: 'image/webp' }, subir)
-      const { audioMessage } = await prepareWAMessageMedia(
-        { audio, mimetype: 'audio/ogg; codecs=opus', seconds: MAX_SEGUNDOS },
-        subir
-      )
+      const [{ stickerMessage }, { audioMessage }] = await Promise.all([
+        prepareWAMessageMedia({ sticker, mimetype: 'image/webp' }, subir),
+        prepareWAMessageMedia({ audio, mimetype: 'audio/ogg; codecs=opus', seconds: MAX_SEGUNDOS }, subir)
+      ])
 
       // Sticker animado normal con su audio dentro (campo audioMessage del sticker).
       // Si la app no soporta stickers con sonido, al menos se ve el sticker animado.
