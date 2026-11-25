@@ -185,34 +185,58 @@
   }
 
   // 15 fps para que se vea como video; la calidad baja solo si pasa del límite
-  const ajustes = () => ({ fps: 15, calidades: [40, 25, 15, 5] })
+  // 12 fps: se ve como video y deja más calidad por fotograma que 15 fps
+  const FPS = 12
+  // Cuánto pesa el sticker con cada calidad, comparado con calidad 40 (medido con videos de prueba)
+  const PESO_RELATIVO = [[60, 1.3], [50, 1.13], [40, 1], [30, 0.87], [25, 0.8], [20, 0.72], [15, 0.64], [10, 0.55], [5, 0.45], [1, 0.38]]
   const filtro = (fps) =>
     `fps=${fps},scale=512:512:force_original_aspect_ratio=decrease:flags=fast_bilinear,pad=512:512:-1:-1:color=0x00000000,format=yuva420p`
 
+  async function convertirVideo(nombre, segundos, calidad, salida) {
+    const codigo = await ffmpeg.exec([
+      '-t', String(segundos), '-i', nombre, '-an', '-vf', filtro(FPS),
+      '-c:v', 'libwebp_anim', '-lossless', '0', '-q:v', String(calidad), '-compression_level', '0', '-loop', '0', salida
+    ])
+    if (codigo !== 0) throw new Error('No se pudo leer ese video')
+    return ffmpeg.readFile(salida)
+  }
+
   async function hacerSticker(f, segundosVideo) {
     const duracion = Math.min(maxSegundos, segundosVideo || maxSegundos)
-    const { fps, calidades } = ajustes(duracion)
     const nombre = 'entrada' + (f.name.match(/\.\w+$/)?.[0] || '.mp4')
     await ffmpeg.writeFile(nombre, new Uint8Array(await f.arrayBuffer()))
 
-    // Avance de la conversión según el tiempo procesado
+    // 1) Calibración: convierte solo el primer segundo para calcular cuánto pesará todo
+    mostrarEstado('Calculando la mejor calidad…')
+    sinPorcentaje()
+    const muestra = Math.min(1, duracion)
+    const pesoMuestra = (await convertirVideo(nombre, muestra, 40, 'muestra.webp')).length
+    const estimadoQ40 = (pesoMuestra / muestra) * duracion
+    // La mejor calidad que cabe con un margen del 10 %; si nada cabe, la más baja
+    let indice = PESO_RELATIVO.findIndex(([, r]) => estimadoQ40 * r <= MAX_BYTES * 0.9)
+    if (indice < 0) indice = PESO_RELATIVO.length - 1
+
+    // 2) El sticker completo (normalmente una sola vez)
     const alProgresar = ({ time }) => {
       if (time > 0) avance(((time / 1e6) / duracion) * 100)
     }
     ffmpeg.on('progress', alProgresar)
-
     let sticker = null
+    let intentos = 0
     try {
-      for (const [i, calidad] of calidades.entries()) {
-        mostrarEstado(i === 0 ? 'Haciendo el sticker…' : 'Ajustando el peso del sticker…')
+      for (let i = indice; i < PESO_RELATIVO.length; i++) {
+        intentos++
+        mostrarEstado(i === indice ? 'Haciendo el sticker…' : 'Ajustando el peso del sticker…')
         avance(0)
-        const codigo = await ffmpeg.exec([
-          '-t', String(maxSegundos), '-i', nombre, '-an', '-vf', filtro(fps),
-          '-c:v', 'libwebp_anim', '-lossless', '0', '-q:v', String(calidad), '-compression_level', '0', '-loop', '0', 'sticker.webp'
-        ])
-        if (codigo !== 0) throw new Error('No se pudo leer ese video')
-        sticker = await ffmpeg.readFile('sticker.webp')
-        if (sticker.length <= MAX_BYTES) break
+        sticker = await convertirVideo(nombre, maxSegundos, PESO_RELATIVO[i][0], 'sticker.webp')
+        if (sticker.length <= MAX_BYTES) {
+          console.info(`[sticker] calidad ${PESO_RELATIVO[i][0]}, ${intentos} intento(s), ${Math.round(sticker.length / 1024)} KB (estimado ${Math.round(estimadoQ40 * PESO_RELATIVO[indice][1] / 1024)} KB)`)
+          break
+        }
+        // Si se pasó, salta directo a la calidad que debería caber según lo que pesó
+        const necesario = MAX_BYTES * 0.9 / sticker.length * PESO_RELATIVO[i][1]
+        const siguiente = PESO_RELATIVO.findIndex(([, r]) => r <= necesario)
+        if (siguiente > i) i = siguiente - 1
       }
     } finally {
       ffmpeg.off('progress', alProgresar)
@@ -228,7 +252,7 @@
       if (audio.length < 200) audio = null
     }
 
-    for (const n of [nombre, 'sticker.webp', 'audio.ogg']) await ffmpeg.deleteFile(n).catch(() => {})
+    for (const n of [nombre, 'muestra.webp', 'sticker.webp', 'audio.ogg']) await ffmpeg.deleteFile(n).catch(() => {})
     return { sticker, audio, segundos: duracion }
   }
 
