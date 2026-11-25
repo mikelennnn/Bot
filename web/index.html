@@ -145,15 +145,36 @@
     if (!trabajando) enviar.disabled = !(conectado && archivo.files[0])
   }
 
-  // ---------- Conversor (ffmpeg.wasm, servido desde este mismo sitio) ----------
+  // ---------- Conversor (ffmpeg.wasm) ----------
+  // El archivo pesado (31 MB) se baja de un CDN público para no gastar el tráfico del bot.
+  // Si el CDN no responde, se baja del propio bot.
+  const CDN = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm'
+  const PROPIO = '/ffmpeg/core'
   let ffmpeg = null
   let cargando = null
+
+  async function origenDelConversor() {
+    try {
+      const r = await fetch(`${CDN}/ffmpeg-core.js`, { method: 'HEAD', mode: 'cors', signal: AbortSignal.timeout(5000) })
+      if (r.ok) return CDN
+    } catch (e) {}
+    return PROPIO
+  }
+
   function cargarConversor() {
     if (!cargando) {
       cargando = (async () => {
         const { FFmpeg } = await import('/ffmpeg/ffmpeg/index.js')
-        const f = new FFmpeg()
-        await f.load({ coreURL: '/ffmpeg/core/ffmpeg-core.js', wasmURL: '/ffmpeg/core/ffmpeg-core.wasm' })
+        const origen = await origenDelConversor()
+        let f = new FFmpeg()
+        try {
+          await f.load({ coreURL: `${origen}/ffmpeg-core.js`, wasmURL: `${origen}/ffmpeg-core.wasm` })
+        } catch (e) {
+          if (origen === PROPIO) throw e
+          f.terminate()
+          f = new FFmpeg()
+          await f.load({ coreURL: `${PROPIO}/ffmpeg-core.js`, wasmURL: `${PROPIO}/ffmpeg-core.wasm` })
+        }
         ffmpeg = f
         return f
       })()
@@ -212,14 +233,30 @@
 
   // ---------- Enviar al bot y esperar a que llegue al grupo ----------
   async function mandar({ sticker, audio, segundos }) {
-    const r = await fetch('/api/sticker', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/octet-stream', 'X-Tam-Sticker': String(sticker.length), 'X-Segundos': String(segundos) },
-      body: new Blob(audio ? [sticker, audio] : [sticker])
-    })
-    const d = await r.json().catch(() => ({}))
-    if (!r.ok) throw new Error(d.error || 'No se pudo mandar el sticker al bot')
-    return d.id
+    // Si el bot está recibiendo muchos a la vez, responde "ocupado": se reintenta solo
+    for (let intento = 1; ; intento++) {
+      let r
+      try {
+        r = await fetch('/api/sticker', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream', 'X-Tam-Sticker': String(sticker.length), 'X-Segundos': String(segundos) },
+          body: new Blob(audio ? [sticker, audio] : [sticker])
+        })
+      } catch (e) {
+        if (intento >= 40) throw new Error('No se pudo mandar el sticker al bot')
+        mostrarEstado('Se cortó la conexión, reintentando…')
+        await new Promise((res) => setTimeout(res, 3000))
+        continue
+      }
+      const d = await r.json().catch(() => ({}))
+      if (r.ok) return d.id
+      if (r.status === 503 && intento < 40) {
+        mostrarEstado('Mucha gente mandando stickers, reintentando…')
+        await new Promise((res) => setTimeout(res, 2000 + Math.random() * 3000))
+        continue
+      }
+      throw new Error(d.error || 'No se pudo mandar el sticker al bot')
+    }
   }
 
   async function esperarEnvio(id) {
