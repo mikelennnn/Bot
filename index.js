@@ -10,7 +10,7 @@ import readline from 'readline'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
-import { iniciarWeb, actualizarConexion, prepararGrupo } from './lib/web.js'
+import { iniciarWeb, actualizarConexion, prepararGrupo, ponerCodigoVinculacion } from './lib/web.js'
 import { datosGrupoGuardados, escucharGrupos, cacheDispositivos, recibosRapidos, contarNodos } from './lib/cache.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -104,6 +104,7 @@ async function iniciar() {
       try {
         const codigo = await sock.requestPairingCode(numero)
         console.log(`\nTu código de vinculación: ${codigo}`)
+        ponerCodigoVinculacion(codigo)
         console.log('WhatsApp > Dispositivos vinculados > Vincular con número de teléfono\n')
       } catch (e) {
         console.log('Error al pedir el código:', e?.message || e)
@@ -120,6 +121,7 @@ async function iniciar() {
 
     if (connection === 'close') {
       pidiendoCodigo = false
+      actualizarConexion(null) // la fila espera a que se reconecte en vez de fallar
       const codigo = lastDisconnect?.error?.output?.statusCode
       if (codigo === DisconnectReason.loggedOut) {
         console.log('Sesión cerrada. Borrando sesión para vincular de nuevo...')
