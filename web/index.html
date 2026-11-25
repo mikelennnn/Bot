@@ -185,65 +185,35 @@
   }
 
   // 15 fps para que se vea como video; la calidad baja solo si pasa del límite
-  // 12 fps: se ve como video y deja más calidad por fotograma que 15 fps
   // Compresión nivel 2: ~35 % menos peso que el nivel 0 con la misma calidad (tarda ~1.5 veces más)
-  const FPS = 12
+  // Fluidez preferida y alternativas: si el video es muy difícil, baja los fps antes que pixelar
+  const OPCIONES_FPS = [12, 10, 8]
+  const CALIDAD_MINIMA = 35 // por debajo de esto se ve con bloques
   // Cuánto pesa el sticker con cada calidad, comparado con calidad 40 (medido con videos de prueba)
   const PESO_RELATIVO = [[60, 1.3], [50, 1.13], [40, 1], [30, 0.87], [25, 0.8], [20, 0.72], [15, 0.64], [10, 0.55], [5, 0.45], [1, 0.38]]
-  const filtro = (fps) =>
-    `fps=${fps},scale=512:512:force_original_aspect_ratio=decrease:flags=fast_bilinear,pad=512:512:-1:-1:color=0x00000000,format=yuva420p`
+  // area: escalado limpio; hqdn3d (ya en 512 px): quita el grano del video, que pesa mucho al comprimir
+  const FILTRO = `fps=${OPCIONES_FPS[0]},scale=512:512:force_original_aspect_ratio=decrease:flags=area,hqdn3d=3:2:6:4,pad=512:512:-1:-1:color=0x00000000,format=yuva420p`
 
-  async function convertirVideo(nombre, segundos, calidad, salida) {
+  // Comprime a WebP animado desde los fotogramas ya preparados (no vuelve a leer el video)
+  async function comprimir({ desde = 0, segundos, fps, calidad, salida }) {
     const codigo = await ffmpeg.exec([
-      '-t', String(segundos), '-i', nombre, '-an', '-vf', filtro(FPS),
+      ...(desde > 0 ? ['-ss', desde.toFixed(2)] : []), ...(segundos ? ['-t', String(segundos)] : []), '-i', 'fotogramas.nut',
+      ...(fps < OPCIONES_FPS[0] ? ['-vf', `fps=${fps}`] : []),
       '-c:v', 'libwebp_anim', '-lossless', '0', '-q:v', String(calidad), '-compression_level', '2', '-loop', '0', salida
     ])
-    if (codigo !== 0) throw new Error('No se pudo leer ese video')
+    if (codigo !== 0) throw new Error('No se pudo hacer el sticker')
     return ffmpeg.readFile(salida)
   }
+
+  // Mejor calidad que cabe para un peso estimado (con calidad 40); -1 si ninguna
+  const mejorCalidad = (estimado40) => PESO_RELATIVO.findIndex(([, r]) => estimado40 * r <= MAX_BYTES * 0.9)
 
   async function hacerSticker(f, segundosVideo) {
     const duracion = Math.min(maxSegundos, segundosVideo || maxSegundos)
     const nombre = 'entrada' + (f.name.match(/\.\w+$/)?.[0] || '.mp4')
     await ffmpeg.writeFile(nombre, new Uint8Array(await f.arrayBuffer()))
 
-    // 1) Calibración: convierte solo el primer segundo para calcular cuánto pesará todo
-    mostrarEstado('Calculando la mejor calidad…')
-    sinPorcentaje()
-    const muestra = Math.min(1, duracion)
-    const pesoMuestra = (await convertirVideo(nombre, muestra, 40, 'muestra.webp')).length
-    const estimadoQ40 = (pesoMuestra / muestra) * duracion
-    // La mejor calidad que cabe con un margen del 10 %; si nada cabe, la más baja
-    let indice = PESO_RELATIVO.findIndex(([, r]) => estimadoQ40 * r <= MAX_BYTES * 0.9)
-    if (indice < 0) indice = PESO_RELATIVO.length - 1
-
-    // 2) El sticker completo (normalmente una sola vez)
-    const alProgresar = ({ time }) => {
-      if (time > 0) avance(((time / 1e6) / duracion) * 100)
-    }
-    ffmpeg.on('progress', alProgresar)
-    let sticker = null
-    let intentos = 0
-    try {
-      for (let i = indice; i < PESO_RELATIVO.length; i++) {
-        intentos++
-        mostrarEstado(i === indice ? 'Haciendo el sticker…' : 'Ajustando el peso del sticker…')
-        avance(0)
-        sticker = await convertirVideo(nombre, maxSegundos, PESO_RELATIVO[i][0], 'sticker.webp')
-        if (sticker.length <= MAX_BYTES) {
-          console.info(`[sticker] calidad ${PESO_RELATIVO[i][0]}, ${intentos} intento(s), ${Math.round(sticker.length / 1024)} KB (estimado ${Math.round(estimadoQ40 * PESO_RELATIVO[indice][1] / 1024)} KB)`)
-          break
-        }
-        // Si se pasó, salta directo a la calidad que debería caber según lo que pesó
-        const necesario = MAX_BYTES * 0.9 / sticker.length * PESO_RELATIVO[i][1]
-        const siguiente = PESO_RELATIVO.findIndex(([, r]) => r <= necesario)
-        if (siguiente > i) i = siguiente - 1
-      }
-    } finally {
-      ffmpeg.off('progress', alProgresar)
-    }
-
-    // Audio (si el video no tiene sonido, el sticker va sin audio)
+    // 1) Audio (si el video no tiene sonido, el sticker va sin audio)
     mostrarEstado('Sacando el sonido…')
     sinPorcentaje()
     let audio = null
@@ -253,7 +223,66 @@
       if (audio.length < 200) audio = null
     }
 
-    for (const n of [nombre, 'muestra.webp', 'sticker.webp', 'audio.ogg']) await ffmpeg.deleteFile(n).catch(() => {})
+    // 2) Lee el video UNA sola vez: fotogramas ya en 512 px y sin grano
+    mostrarEstado('Leyendo el video…')
+    const alProgresar = ({ time }) => {
+      if (time > 0) avance(((time / 1e6) / duracion) * 100)
+    }
+    ffmpeg.on('progress', alProgresar)
+    let codigo
+    try {
+      codigo = await ffmpeg.exec(['-t', String(maxSegundos), '-i', nombre, '-an', '-vf', FILTRO, '-c:v', 'rawvideo', '-f', 'nut', 'fotogramas.nut'])
+    } finally {
+      ffmpeg.off('progress', alProgresar)
+    }
+    await ffmpeg.deleteFile(nombre).catch(() => {}) // libera memoria: ya no hace falta el video
+    if (codigo !== 0) throw new Error('No se pudo leer ese video')
+
+    // 3) Calibración con 3 pedacitos (principio, mitad y final) para que el cálculo valga para todo el video
+    mostrarEstado('Calculando la mejor calidad…')
+    sinPorcentaje()
+    const largo = Math.min(1, duracion)
+    const puntos = [...new Set([0, duracion / 2 - largo / 2, duracion - largo].map((t) => Math.max(0, Math.round(t * 10) / 10)))]
+    let pesoTotal = 0
+    for (const desde of puntos) {
+      pesoTotal += (await comprimir({ desde, segundos: largo, fps: OPCIONES_FPS[0], calidad: 40, salida: 'muestra.webp' })).length
+    }
+    const porSegundo = pesoTotal / (puntos.length * largo)
+
+    // 4) Elige los fps más altos que permitan calidad >= CALIDAD_MINIMA; si ninguno, el más bajo
+    let fps = OPCIONES_FPS[OPCIONES_FPS.length - 1]
+    let indice = -1
+    for (const opcion of OPCIONES_FPS) {
+      const i = mejorCalidad(porSegundo * (opcion / OPCIONES_FPS[0]) * duracion)
+      if (i >= 0 && PESO_RELATIVO[i][0] >= CALIDAD_MINIMA) {
+        fps = opcion
+        indice = i
+        break
+      }
+    }
+    if (indice < 0) {
+      const i = mejorCalidad(porSegundo * (fps / OPCIONES_FPS[0]) * duracion)
+      indice = i >= 0 ? i : PESO_RELATIVO.length - 1
+    }
+
+    // 5) El sticker completo (normalmente una sola vez)
+    let sticker = null
+    let intentos = 0
+    for (let i = indice; i < PESO_RELATIVO.length; i++) {
+      intentos++
+      mostrarEstado(i === indice ? 'Haciendo el sticker…' : 'Ajustando el peso del sticker…')
+      sticker = await comprimir({ fps, calidad: PESO_RELATIVO[i][0], salida: 'sticker.webp' })
+      if (sticker.length <= MAX_BYTES) {
+        console.info(`[sticker] ${fps} fps, calidad ${PESO_RELATIVO[i][0]}, ${intentos} intento(s), ${Math.round(sticker.length / 1024)} KB`)
+        break
+      }
+      // Si se pasó, salta a la calidad que debería caber según lo que pesó de verdad
+      const necesario = (MAX_BYTES * 0.9) / sticker.length * PESO_RELATIVO[i][1]
+      const siguiente = PESO_RELATIVO.findIndex(([, r]) => r <= necesario)
+      if (siguiente > i) i = siguiente - 1
+    }
+
+    for (const n of [nombre, 'fotogramas.nut', 'muestra.webp', 'sticker.webp', 'audio.ogg']) await ffmpeg.deleteFile(n).catch(() => {})
     return { sticker, audio, segundos: duracion }
   }
 
