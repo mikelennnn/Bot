@@ -269,7 +269,12 @@
       if (d.error) throw new Error(d.error)
       if (d.estado === 'listo') return d.mensaje
       if (d.estado === 'error') throw new Error(d.mensaje)
-      mostrarEstado(d.antes > 0 ? `Sticker listo, esperando turno para mandarse (${d.antes} antes)…` : 'Mandando tu sticker al grupo…')
+      mostrarEstado(
+        d.antes > 0
+          ? `✅ Sticker listo y guardado. Ya puedes salir, se mandará solo al grupo (${d.antes} antes que el tuyo)`
+          : '✅ Sticker listo y guardado. Ya puedes salir, se está mandando al grupo',
+        'ok'
+      )
     }
   }
 
@@ -321,6 +326,7 @@
       // Ya está en el bot: aunque se salga, se manda igual
       trabajando = false
       aviso.style.display = 'none'
+      mostrarEstado('✅ Sticker listo y guardado. Ya puedes salir, se mandará solo al grupo', 'ok')
       const mensaje = await esperarEnvio(id)
       mostrarEstado('✅ ' + mensaje, 'ok')
       archivo.value = ''
