@@ -155,7 +155,7 @@ async function iniciar() {
 }
 
 // Interruptor: true = bot apagado (no se conecta a WhatsApp y la página avisa que está apagado)
-const APAGADO = true
+const APAGADO = false
 
 if (APAGADO) {
   const http = await import('http')
