@@ -11,7 +11,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
 import { iniciarWeb, actualizarConexion, prepararGrupo } from './lib/web.js'
-import { datosGrupoGuardados, escucharGrupos, cacheDispositivos, recibosRapidos } from './lib/cache.js'
+import { datosGrupoGuardados, escucharGrupos, cacheDispositivos, recibosRapidos, contarNodos } from './lib/cache.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const CARPETA_SESION = process.env.SESION_DIR || path.join(__dirname, 'sesion_bot')
@@ -86,6 +86,7 @@ async function iniciar() {
   sock.ev.on('creds.update', saveCreds)
   escucharGrupos(sock)
   recibosRapidos(sock)
+  contarNodos(sock)
 
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
     // Primera vez: pedir número y generar código de 8 dígitos
