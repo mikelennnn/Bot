@@ -115,7 +115,7 @@
 
     <label class="zona" for="archivo">
       <strong>🎬 Elige un video</strong>
-      <span id="nombre">Luego eliges el pedazo y el encuadre (hasta 10 s)</span>
+      <span id="nombre">Luego eliges el pedazo y el encuadre (hasta 20 s)</span>
     </label>
     <input type="file" id="archivo" accept="video/*">
     <div class="editor" id="editor">
@@ -132,7 +132,7 @@
       </div>
       <div class="tiempo">
         <label>Empieza en <b id="tInicio">0.0 s</b><input type="range" id="inicio" min="0" max="0" step="0.1" value="0"></label>
-        <label>Dura <b id="tDura">10.0 s</b><input type="range" id="dura" min="1" max="10" step="0.1" value="10"></label>
+        <label>Dura <b id="tDura">20.0 s</b><input type="range" id="dura" min="1" max="20" step="0.1" value="20"></label>
       </div>
     </div>
 
@@ -154,7 +154,7 @@
   // PRUEBA: hasta 1 MB (las reglas de paquetes dicen 500 KB; probamos si WhatsApp acepta más)
   const MAX_BYTES = 1000 * 1024
   let conectado = false
-  let maxSegundos = 10
+  let maxSegundos = 20
   let trabajando = false
 
   function mostrarEstado(texto, tipo = '') {
@@ -181,7 +181,7 @@
     try {
       const d = await (await fetch('/api/info', { cache: 'no-store' })).json()
       conectado = d.conectado
-      maxSegundos = d.maxSegundos || 10
+      maxSegundos = d.maxSegundos || 20
       $('punto').classList.toggle('ok', conectado)
       $('destino').innerHTML = conectado ? 'Se enviará a <b></b>' : 'El bot no está conectado ahora mismo'
       if (conectado) $('destino').querySelector('b').textContent = d.grupo
@@ -190,7 +190,7 @@
       conectado = false
       $('destino').textContent = 'No se pudo contactar al bot'
     }
-    if (!trabajando) enviar.disabled = !(conectado && archivo.files[0])
+    if (!trabajando) enviar.disabled = !(conectado && videoElegido)
   }
 
   // ---------- Conversor (ffmpeg.wasm) ----------
@@ -242,13 +242,15 @@
   // El recorte va en fracciones del video (0 a 1), así no importa su resolución ni si está girado
   const filtro = ({ x, y, w, h }) =>
     `crop=iw*${w.toFixed(4)}:ih*${h.toFixed(4)}:iw*${x.toFixed(4)}:ih*${y.toFixed(4)},` +
-    `fps=${OPCIONES_FPS[0]},scale=512:512:force_original_aspect_ratio=decrease:flags=area,hqdn3d=3:2:6:4,pad=512:512:-1:-1:color=0x00000000,format=yuva420p`
+    `fps=${OPCIONES_FPS[0]},scale=512:512:force_original_aspect_ratio=decrease:flags=area,hqdn3d=3:2:6:4,format=yuv420p`
+  // El relleno transparente hasta 512x512 se agrega al comprimir (así los fotogramas guardados ocupan mucho menos)
+  const RELLENO = 'pad=512:512:-1:-1:color=0x00000000,format=yuva420p'
 
   // Comprime a WebP animado desde los fotogramas ya preparados (no vuelve a leer el video)
   async function comprimir({ desde = 0, segundos, fps, calidad, salida }) {
     const codigo = await ffmpeg.exec([
       ...(desde > 0 ? ['-ss', desde.toFixed(2)] : []), ...(segundos ? ['-t', String(segundos)] : []), '-i', 'fotogramas.nut',
-      ...(fps < OPCIONES_FPS[0] ? ['-vf', `fps=${fps}`] : []),
+      '-vf', fps < OPCIONES_FPS[0] ? `fps=${fps},${RELLENO}` : RELLENO,
       '-c:v', 'libwebp_anim', '-lossless', '0', '-q:v', String(calidad), '-compression_level', '2', '-loop', '0', salida
     ])
     if (codigo !== 0) throw new Error('No se pudo hacer el sticker')
@@ -389,6 +391,7 @@
   let recorte = { x: 0, y: 0, w: 1, h: 1 } // fracciones del video
   let sinBordes = { x: 0, y: 0, w: 1, h: 1 } // zona útil detectada (sin franjas negras)
   let modo = 'auto'
+  let videoElegido = null // copia en memoria del video elegido
 
   function pintarRecuadro() {
     Object.assign(recuadro.style, {
@@ -532,7 +535,17 @@
     enviar.disabled = true
     cargarConversor().catch(() => {}) // empieza a descargar el conversor mientras eligen
 
-    vista.src = URL.createObjectURL(f)
+    // Copia el video a la memoria de la página YA: en Android, Chrome puede quitar el permiso
+    // de leer el archivo original al rato ("The requested file could not be read")
+    try {
+      videoElegido = new File([await f.arrayBuffer()], f.name, { type: f.type })
+    } catch (e) {
+      videoElegido = null
+      mostrarEstado('No se pudo abrir ese video, vuelve a elegirlo', 'error')
+      return
+    }
+    if (vista.src) URL.revokeObjectURL(vista.src)
+    vista.src = URL.createObjectURL(videoElegido)
     await new Promise((r) => {
       vista.addEventListener('loadeddata', r, { once: true })
       vista.addEventListener('error', r, { once: true })
@@ -541,7 +554,8 @@
     editor.style.display = 'block'
     ajustarLienzo()
     inicio.value = 0
-    dura.value = maxSegundos
+    actualizarTiempo() // primero fija el máximo según el video
+    dura.value = dura.max // y luego usa todo lo que se pueda (hasta 20 s)
     actualizarTiempo()
 
     mostrarEstado('Revisando bordes negros…')
@@ -555,7 +569,7 @@
   })
 
   enviar.addEventListener('click', async () => {
-    const f = archivo.files[0]
+    const f = videoElegido
     if (!f) return
     trabajando = true
     enviar.disabled = true
@@ -587,10 +601,14 @@
       const mensaje = await esperarEnvio(id)
       mostrarEstado('✅ ' + mensaje, 'ok')
       archivo.value = ''
+      videoElegido = null
       editor.style.display = 'none'
       $('nombre').textContent = 'Puedes hacer otro sticker'
     } catch (e) {
-      const texto = /memory|abort|RuntimeError/i.test(String(e?.message)) ? 'Tu teléfono no pudo hacer el sticker con ese video' : e.message
+      const msg = String(e?.message || e)
+      const texto = /could not be read|NotReadable|permission/i.test(msg)
+        ? 'No se pudo leer el video, vuelve a elegirlo'
+        : /memory|abort|RuntimeError/i.test(msg) ? 'Tu teléfono no pudo hacer el sticker con ese video' : msg
       mostrarEstado('❌ ' + texto, 'error')
     } finally {
       trabajando = false
@@ -598,7 +616,7 @@
       barra.style.display = 'none'
       archivo.disabled = false
       editor.classList.remove('bloqueado')
-      enviar.disabled = !(conectado && archivo.files[0])
+      enviar.disabled = !(conectado && videoElegido)
     }
   })
 
