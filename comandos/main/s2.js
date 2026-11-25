@@ -105,6 +105,7 @@ export default {
       await fs.writeFile(entrada, await descargar(video))
 
       const { sticker, audio } = await convertir(entrada, carpeta)
+      console.log(`[s2] video ${video.seconds || '?'}s → sticker ${(sticker.length / 1024).toFixed(0)} KB, audio ${audio ? (audio.length / 1024).toFixed(0) + ' KB' : 'sin sonido'}`)
       if (!audio) return avisar(sock, m, '❌ EL VIDEO NO TIENE SONIDO')
 
       const subir = { upload: sock.waUploadToServer }
@@ -114,20 +115,18 @@ export default {
         subir
       )
 
-      // Formato de sticker con sonido: el sticker lleva su audio dentro
+      // Sticker animado normal con su audio dentro (campo audioMessage del sticker).
+      // Si la app no soporta stickers con sonido, al menos se ve el sticker animado.
       const contenido = {
-        audioStickerMessage: {
-          message: {
-            stickerMessage: {
-              ...stickerMessage,
-              isAnimated: true,
-              audioMessage: { ...audioMessage, seconds: Math.min(Number(video.seconds) || MAX_SEGUNDOS, MAX_SEGUNDOS) }
-            }
-          }
+        stickerMessage: {
+          ...stickerMessage,
+          isAnimated: true,
+          audioMessage: { ...audioMessage, seconds: Math.min(Number(video.seconds) || MAX_SEGUNDOS, MAX_SEGUNDOS) }
         }
       }
       const msg = generateWAMessageFromContent(jid, contenido, { quoted: m, userJid: sock.user.id })
       await sock.relayMessage(jid, msg.message, { messageId: msg.key.id })
+      console.log(`[s2] sticker enviado (${msg.key.id})`)
     } finally {
       fs.rm(carpeta, { recursive: true, force: true }).catch(() => {})
     }
