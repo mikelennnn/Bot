@@ -2,7 +2,8 @@ import makeWASocket, {
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
-  Browsers
+  Browsers,
+  makeCacheableSignalKeyStore
 } from '@itsliaaa/baileys'
 import pino from 'pino'
 import readline from 'readline'
@@ -10,6 +11,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
 import { iniciarWeb, actualizarConexion, prepararGrupo } from './lib/web.js'
+import { datosGrupoGuardados, escucharGrupos, cacheDispositivos } from './lib/cache.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const CARPETA_SESION = process.env.SESION_DIR || path.join(__dirname, 'sesion_bot')
@@ -68,16 +70,21 @@ async function iniciar() {
   const { state, saveCreds } = await useMultiFileAuthState(CARPETA_SESION)
   const { version } = await fetchLatestBaileysVersion()
 
+  const logger = pino({ level: 'silent' })
   const sock = makeWASocket({
     version,
-    logger: pino({ level: 'silent' }),
-    auth: state,
+    logger,
+    // Llaves en memoria: antes cada envío leía cientos de archivos del disco
+    auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, logger) },
+    cachedGroupMetadata: datosGrupoGuardados,
+    userDevicesCache: cacheDispositivos,
     browser: Browsers.ubuntu('Chrome'),
     printQRInTerminal: false,
     markOnlineOnConnect: false
   })
 
   sock.ev.on('creds.update', saveCreds)
+  escucharGrupos(sock)
 
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
     // Primera vez: pedir número y generar código de 8 dígitos

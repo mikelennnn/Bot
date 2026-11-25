@@ -176,10 +176,24 @@
     e.returnValue = ''
   })
 
+  // Identificador de este teléfono (solo se permite 1 sticker en la fila por persona)
+  const CLIENTE = (() => {
+    try {
+      let c = localStorage.getItem('cliente')
+      if (!c) localStorage.setItem('cliente', (c = (crypto.randomUUID?.() || String(Math.random()).slice(2) + Date.now())))
+      return c
+    } catch (e) {
+      return String(Math.random()).slice(2) + Date.now()
+    }
+  })()
+
+  let pendiente = null // sticker de esta persona que sigue en la fila
+
   // ---------- Estado del bot ----------
   async function info() {
     try {
-      const d = await (await fetch('/api/info', { cache: 'no-store' })).json()
+      const d = await (await fetch('/api/info?cliente=' + encodeURIComponent(CLIENTE), { cache: 'no-store' })).json()
+      pendiente = d.pendiente || null
       conectado = d.conectado
       maxSegundos = d.maxSegundos || 20
       $('punto').classList.toggle('ok', conectado)
@@ -350,7 +364,7 @@
       try {
         r = await fetch('/api/sticker', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/octet-stream', 'X-Tam-Sticker': String(sticker.length), 'X-Segundos': String(segundos) },
+          headers: { 'Content-Type': 'application/octet-stream', 'X-Cliente': CLIENTE, 'X-Tam-Sticker': String(sticker.length), 'X-Segundos': String(segundos) },
           body: new Blob(audio ? [sticker, audio] : [sticker])
         })
       } catch (e) {
@@ -570,6 +584,11 @@
   enviar.addEventListener('click', async () => {
     const f = videoElegido
     if (!f) return
+    await info()
+    if (pendiente) {
+      mostrarEstado('⏳ Ya tienes un sticker en la fila. Espera a que se mande para hacer otro', 'error')
+      return
+    }
     trabajando = true
     enviar.disabled = true
     archivo.disabled = true
