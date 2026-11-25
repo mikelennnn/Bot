@@ -244,7 +244,8 @@
     `crop=iw*${w.toFixed(4)}:ih*${h.toFixed(4)}:iw*${x.toFixed(4)}:ih*${y.toFixed(4)},` +
     `fps=${OPCIONES_FPS[0]},scale=512:512:force_original_aspect_ratio=decrease:flags=area,hqdn3d=3:2:6:4,format=yuv420p`
   // El relleno transparente hasta 512x512 se agrega al comprimir (así los fotogramas guardados ocupan mucho menos)
-  const RELLENO = 'pad=512:512:-1:-1:color=0x00000000,format=yuva420p'
+  // Primero se activa la transparencia (yuva420p) y luego se rellena: al revés, el relleno sale negro
+  const RELLENO = 'format=yuva420p,pad=512:512:-1:-1:color=0x00000000'
 
   // Comprime a WebP animado desde los fotogramas ya preparados (no vuelve a leer el video)
   async function comprimir({ desde = 0, segundos, fps, calidad, salida }) {
