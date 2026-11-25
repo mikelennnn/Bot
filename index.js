@@ -66,6 +66,8 @@ function preguntar(texto) {
   )
 }
 
+let llavesEnMemoria = null
+
 async function iniciar() {
   const { state, saveCreds } = await useMultiFileAuthState(CARPETA_SESION)
   const { version } = await fetchLatestBaileysVersion()
@@ -74,8 +76,9 @@ async function iniciar() {
   const sock = makeWASocket({
     version,
     logger,
-    // Llaves en memoria: antes cada envío leía cientos de archivos del disco
-    auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, logger) },
+    // Llaves en memoria: antes cada envío leía cientos de archivos del disco.
+    // Se conserva entre reconexiones para no volver a cargar todo desde cero.
+    auth: { creds: state.creds, keys: (llavesEnMemoria ||= makeCacheableSignalKeyStore(state.keys, logger)) },
     cachedGroupMetadata: datosGrupoGuardados,
     userDevicesCache: cacheDispositivos,
     browser: Browsers.ubuntu('Chrome'),
