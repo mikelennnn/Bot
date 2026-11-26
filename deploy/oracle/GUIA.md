@@ -1,4 +1,4 @@
-# Pasar Erza-Bot-MD a Oracle Cloud (gratis, 4 núcleos)
+# Pasar Erza-Bot-MD a Oracle Cloud (gratis, 2 núcleos y 12 GB)
 
 Tiempo: unos 30–40 minutos. Todo se puede hacer desde el celular.
 
@@ -23,8 +23,8 @@ al crear la instancia; regresa a este paso después) → **Security Lists** →
 ## 4. Crear la máquina — 5 min
 Menú ☰ → **Compute → Instances → Create instance**
 - **Image**: Canonical **Ubuntu 22.04** (o 24.04)
-- **Shape**: *Change shape* → **Ampere** → `VM.Standard.A1.Flex` → **4 OCPU, 24 GB**
-  (si dice *Out of capacity*: prueba 2 OCPU / 12 GB, u otro *Availability domain*)
+- **Shape**: *Change shape* → **Ampere** → `VM.Standard.A1.Flex` → **2 OCPU, 12 GB**
+  (si dice *Out of capacity*: prueba 1 OCPU / 6 GB, u otro *Availability domain*)
 - **Networking**: deja que cree la red y marca **Assign a public IPv4 address**
 - **SSH keys**: *Save private key* (guárdala por si acaso)
 - **Show advanced options → Management → Paste cloud-init script**:
