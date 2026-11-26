@@ -1,0 +1,175 @@
+[
+ {
+  "id": "gancho",
+  "src": [
+   55.83,
+   55.9
+  ],
+  "zoom": [
+   0.52,
+   0.6,
+   1.5
+  ],
+  "paso": null,
+  "texto": "¿Ya viste que los stickers ahora tienen sonido? Te enseño a hacerlos gratis, en un minuto.",
+  "capY": 250
+ },
+ {
+  "id": "grupo",
+  "src": [
+   0.0,
+   5.5
+  ],
+  "zoom": [
+   0.5,
+   0.5,
+   1.08
+  ],
+  "paso": "PASO 1 · ENTRA AL GRUPO",
+  "texto": "Primero, métete al grupo de stickers. El link te lo dejo en mi bio o en los comentarios."
+ },
+ {
+  "id": "descripcion",
+  "src": [
+   6.0,
+   9.8
+  ],
+  "zoom": [
+   0.5,
+   0.6,
+   1.25
+  ],
+  "paso": "PASO 1 · ENTRA AL GRUPO",
+  "texto": "Abres la descripción del grupo, y ahí viene la página donde se hacen."
+ },
+ {
+  "id": "pagina",
+  "src": [
+   13.9,
+   17.8
+  ],
+  "zoom": [
+   0.5,
+   0.44,
+   1.25
+  ],
+  "paso": "PASO 2 · ABRE LA PÁGINA",
+  "texto": "Entras a la página, y le das a: elige un video."
+ },
+ {
+  "id": "galeria",
+  "src": [
+   18.0,
+   22.0
+  ],
+  "zoom": [
+   0.5,
+   0.5,
+   1.0
+  ],
+  "paso": "PASO 2 · ABRE LA PÁGINA",
+  "texto": "Agarras el video que quieras de tu galería."
+ },
+ {
+  "id": "bordes",
+  "src": [
+   22.0,
+   26.0
+  ],
+  "zoom": [
+   0.5,
+   0.56,
+   1.2
+  ],
+  "paso": "PASO 3 · AJÚSTALO",
+  "texto": "Y mira, la página solita le quita los bordes negros... así ya no salen feos."
+ },
+ {
+  "id": "barras",
+  "src": [
+   26.0,
+   31.0
+  ],
+  "zoom": [
+   0.5,
+   0.81,
+   1.55
+  ],
+  "paso": "PASO 3 · AJÚSTALO",
+  "texto": "Aquí escoges desde qué segundo empieza y cuánto dura. Aguanta hasta veinte segundos.",
+  "capY": 470
+ },
+ {
+  "id": "recuadro",
+  "src": [
+   31.0,
+   36.0
+  ],
+  "zoom": [
+   0.5,
+   0.4,
+   1.15
+  ],
+  "paso": "PASO 3 · AJÚSTALO",
+  "texto": "Y si quieres, mueves el recuadro pa' escoger qué parte del video sale.",
+  "capY": 470
+ },
+ {
+  "id": "crear",
+  "src": [
+   36.0,
+   46.4
+  ],
+  "zoom": [
+   0.5,
+   0.81,
+   1.5
+  ],
+  "paso": "PASO 4 · CRÉALO",
+  "texto": "Le picas a crear, y aquí ojo: no te salgas de la página, porque tu cel es el que está haciendo el sticker.",
+  "capY": 470
+ },
+ {
+  "id": "listo",
+  "src": [
+   46.4,
+   51.5
+  ],
+  "zoom": [
+   0.5,
+   0.55,
+   1.55
+  ],
+  "paso": "PASO 4 · CRÉALO",
+  "texto": "Cuando te diga que ya se mandó, ya quedó."
+ },
+ {
+  "id": "resultado",
+  "src": [
+   56.0,
+   58.5
+  ],
+  "zoom": [
+   0.8,
+   0.86,
+   1.6
+  ],
+  "paso": "¡LISTO!",
+  "texto": "Te regresas al grupo, y ahí está tu sticker, con todo y sonido. Lo puedes guardar y mandar donde quieras.",
+  "capY": 470
+ },
+ {
+  "id": "cierre",
+  "src": [
+   58.0,
+   58.5
+  ],
+  "zoom": [
+   0.8,
+   0.86,
+   1.6
+  ],
+  "paso": null,
+  "texto": "El link del grupo está en mi bio o en los comentarios. Sígueme pa' más trucos así."
+ }
+]

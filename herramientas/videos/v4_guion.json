@@ -1,0 +1,69 @@
+[
+ {
+  "id": "gancho",
+  "src": [
+   55.9,
+   58.5
+  ],
+  "titulo": "¿MIS STICKERS\\NTIENEN SONIDO?",
+  "paso": "",
+  "texto": "¿Viste que mis stickers tienen sonido? Te enseño a hacerlos en veinte segundos."
+ },
+ {
+  "id": "paso1",
+  "src": [
+   0.0,
+   6.6
+  ],
+  "titulo": "ENTRA AL GRUPO",
+  "paso": "1",
+  "texto": "Uno: entra al grupo. El link te lo dejo al final y en los comentarios."
+ },
+ {
+  "id": "paso2",
+  "src": [
+   14.6,
+   22.5
+  ],
+  "titulo": "ESCOGE TU VIDEO",
+  "paso": "2",
+  "texto": "Dos: abre la página y escoge cualquier video."
+ },
+ {
+  "id": "paso3",
+  "src": [
+   22.5,
+   36.0
+  ],
+  "titulo": "RECÓRTALO",
+  "paso": "3",
+  "texto": "Tres: recórtalo como quieras."
+ },
+ {
+  "id": "crear",
+  "src": [
+   40.0,
+   48.5
+  ],
+  "titulo": "DALE A CREAR",
+  "paso": "4",
+  "texto": "Le picas a crear, esperas tantito..."
+ },
+ {
+  "id": "cierre",
+  "src": [
+   54.0,
+   58.5
+  ],
+  "titulo": "¡Y LISTO!",
+  "paso": "",
+  "texto": "¡y te llega al grupo con todo y sonido! Pruébalo, es gratis."
+ },
+ {
+  "id": "final",
+  "src": [],
+  "titulo": "ÚNETE AL GRUPO",
+  "paso": "",
+  "texto": "Escanea el código o búscalo en los comentarios. ¡Te espero!"
+ }
+]

@@ -1,0 +1,9 @@
+[
+ {"id":"gancho","src":[55.9,58.5],"paso":"","aviso":"¿Stickers que suenan?","texto":"¡Espera! ¿Sabías que puedes hacer stickers que suenan? Mira qué fácil."},
+ {"id":"paso1","src":[0.0,6.6],"paso":"1","aviso":"Entra al grupo","texto":"Primero, únete al grupo. El link está al final del video."},
+ {"id":"paso2","src":[14.6,22.5],"paso":"2","aviso":"Abre la página y elige tu video","texto":"Luego abre la página y elige tu video."},
+ {"id":"paso3","src":[22.5,36.0],"paso":"3","aviso":"Recórtalo a tu gusto","texto":"Ajusta el recorte y la duración."},
+ {"id":"crear","src":[40.0,48.5],"paso":"4","aviso":"Toca «Crear y enviar»","texto":"Toca crear y espera unos segundos."},
+ {"id":"cierre","src":[54.0,58.5],"paso":"","aviso":"¡Listo! Ya está en el grupo","texto":"¡Y llega directo al grupo, con sonido!"},
+ {"id":"final","src":[],"paso":"","aviso":"","texto":"Escanea el código, o copia el link de los comentarios."}
+]

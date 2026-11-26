@@ -1,0 +1,9 @@
+[
+ {"id":"intro","src":[55.9,58.5],"paso":0,"texto":"Así se hacen stickers con sonido, en cuatro pasos."},
+ {"id":"paso1","src":[0.0,6.6],"paso":1,"texto":"Uno: entra al grupo. El link está al final."},
+ {"id":"paso2","src":[14.6,22.5],"paso":2,"texto":"Dos: abre la página y elige tu video."},
+ {"id":"paso3","src":[22.5,36.0],"paso":3,"texto":"Tres: ajusta el recorte y la duración."},
+ {"id":"crear","src":[36.0,48.5],"paso":4,"texto":"Cuatro: toca crear y espera a que termine."},
+ {"id":"cierre","src":[54.0,58.5],"paso":0,"texto":"Tu sticker llega al grupo con sonido."},
+ {"id":"final","src":[],"paso":0,"texto":"Escanea el código o usa el link de los comentarios."}
+]
