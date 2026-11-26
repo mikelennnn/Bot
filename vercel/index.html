@@ -1,0 +1,678 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erza-Bot Stickers</title>
+<style>
+  :root {
+    --fondo: #0d0708;
+    --tarjeta: #1a0e10;
+    --borde: #3a1a1e;
+    --rojo: #e0243a;
+    --rojo-claro: #ff5a6e;
+    --texto: #f6ecec;
+    --gris: #b49ea1;
+    --verde: #3ecf6e;
+    --amarillo: #ffc94d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at 50% -20%, #4a0f18 0%, var(--fondo) 60%);
+    color: var(--texto);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 24px 16px;
+  }
+  main { width: 100%; max-width: 440px; }
+  h1 { margin: 0; font-size: 1.6rem; text-align: center; letter-spacing: .02em; }
+  h1 span { color: var(--rojo-claro); }
+  .sub { text-align: center; color: var(--gris); margin: 6px 0 22px; font-size: .95rem; }
+  .tarjeta {
+    background: var(--tarjeta);
+    border: 1px solid var(--borde);
+    border-radius: 18px;
+    padding: 18px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, .4);
+  }
+  .destino { display: flex; align-items: center; gap: 8px; font-size: .92rem; color: var(--gris); margin-bottom: 14px; }
+  .punto { width: 9px; height: 9px; border-radius: 50%; background: var(--gris); flex: none; }
+  .punto.ok { background: var(--verde); box-shadow: 0 0 8px var(--verde); }
+  .destino b { color: var(--texto); }
+  .fila { font-size: .82rem; color: var(--gris); margin-left: auto; white-space: nowrap; }
+  label.zona {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    border: 2px dashed var(--borde); border-radius: 14px; padding: 26px 12px; cursor: pointer;
+    text-align: center; color: var(--gris); transition: border-color .2s, background .2s;
+  }
+  label.zona:hover { border-color: var(--rojo); background: rgba(224, 36, 58, .06); }
+  label.zona strong { color: var(--texto); font-size: 1.05rem; }
+  input[type=file] { display: none; }
+  .editor { display: none; margin-top: 14px; }
+  .lienzo {
+    position: relative; margin: 0 auto; border-radius: 12px; overflow: hidden; background: #000;
+    touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  .lienzo video { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .recuadro {
+    position: absolute; border: 2px solid var(--rojo-claro); cursor: move;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, .58);
+  }
+  .recuadro::before, .recuadro::after { content: ''; position: absolute; background: rgba(255, 255, 255, .25); pointer-events: none; }
+  .recuadro::before { left: 33.33%; right: 33.33%; top: 0; bottom: 0; border-left: 1px solid; border-right: 1px solid; background: none; border-color: rgba(255, 255, 255, .25); }
+  .recuadro::after { top: 33.33%; bottom: 33.33%; left: 0; right: 0; border-top: 1px solid; border-bottom: 1px solid; background: none; border-color: rgba(255, 255, 255, .25); }
+  .recuadro i {
+    position: absolute; width: 24px; height: 24px; background: var(--rojo); border: 2px solid #fff; border-radius: 50%; z-index: 2;
+  }
+  /* Las esquinas van por dentro del recuadro para que nunca queden cortadas */
+  .recuadro i[data-esq="nw"] { left: -2px; top: -2px; cursor: nwse-resize; }
+  .recuadro i[data-esq="ne"] { right: -2px; top: -2px; cursor: nesw-resize; }
+  .recuadro i[data-esq="sw"] { left: -2px; bottom: -2px; cursor: nesw-resize; }
+  .recuadro i[data-esq="se"] { right: -2px; bottom: -2px; cursor: nwse-resize; }
+  .controles { display: grid; grid-template-columns: 42px 42px 1fr 1fr 1fr; gap: 6px; margin-top: 10px; }
+  .controles button {
+    width: auto; margin: 0; padding: 9px 4px; font-size: .84rem; font-weight: 600; white-space: nowrap;
+    background: var(--borde); color: var(--texto); border-radius: 10px;
+  }
+  .controles button.activo { background: var(--rojo); }
+  .tiempo { margin-top: 12px; display: grid; gap: 10px; }
+  .tiempo label { display: grid; gap: 4px; font-size: .88rem; color: var(--gris); }
+  .tiempo label b { color: var(--texto); }
+  .tiempo input[type=range] { width: 100%; accent-color: var(--rojo); }
+  .editor.bloqueado { pointer-events: none; opacity: .6; }
+  button {
+    width: 100%; margin-top: 14px; padding: 14px; border: 0; border-radius: 12px;
+    background: var(--rojo); color: #fff; font-size: 1.05rem; font-weight: 600; cursor: pointer;
+    transition: background .2s, opacity .2s;
+  }
+  button:hover:not(:disabled) { background: var(--rojo-claro); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .barra { height: 8px; background: var(--borde); border-radius: 99px; overflow: hidden; margin-top: 14px; display: none; }
+  .barra i { display: block; height: 100%; width: 0; background: var(--rojo); transition: width .3s; }
+  .barra.trabajando i { width: 40% !important; animation: vaiven 1.2s ease-in-out infinite; }
+  @keyframes vaiven { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
+  .aviso {
+    display: none; margin-top: 14px; padding: 12px; border-radius: 12px; text-align: center; font-weight: 600;
+    background: rgba(255, 201, 77, .1); border: 1px solid rgba(255, 201, 77, .45); color: var(--amarillo);
+  }
+  .estado { margin-top: 12px; min-height: 1.4em; text-align: center; font-size: .95rem; color: var(--gris); }
+  .estado.ok { color: var(--verde); font-weight: 600; }
+  .estado.error { color: var(--rojo-claro); }
+  .nota { color: var(--gris); font-size: .82rem; text-align: center; margin-top: 16px; line-height: 1.5; }
+  .resultado { display: none; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--borde); text-align: center; }
+  .resultado img { width: 180px; height: 180px; object-fit: contain; display: block; margin: 0 auto;
+    background: repeating-conic-gradient(#2a1418 0 25%, #1a0e10 0 50%) 0 0 / 20px 20px; border-radius: 14px; }
+  .resultado button.secundario { background: var(--borde); }
+  .resultado a.boton { display: block; margin-top: 14px; padding: 14px; border-radius: 12px; text-decoration: none; font-weight: 600; background: #1fa855; color: #fff; }
+  footer { text-align: center; color: var(--gris); font-size: .8rem; margin-top: 22px; }
+  /* ---------- Prioridad (pago) ---------- */
+  .prioridad {
+    margin-bottom: 16px; padding: 14px 16px; border-radius: 16px; text-align: center;
+    background: linear-gradient(135deg, rgba(255, 201, 77, .14), rgba(224, 36, 58, .12));
+    border: 1px solid rgba(255, 201, 77, .5);
+  }
+  .prioridad h2 { margin: 0 0 6px; font-size: 1.05rem; color: var(--amarillo); }
+  .prioridad p { margin: 0; font-size: .9rem; line-height: 1.45; color: var(--texto); }
+  .prioridad .mx { display: inline-block; margin-top: 8px; font-size: .8rem; color: var(--gris); }
+  .prioridad button { margin-top: 10px; padding: 11px; font-size: .98rem; background: var(--amarillo); color: #2a1a00; }
+  .prioridad button:hover:not(:disabled) { background: #ffd877; }
+  .modal {
+    position: fixed; inset: 0; z-index: 50; display: none; align-items: flex-start; justify-content: center;
+    padding: 24px 16px; overflow-y: auto; background: rgba(0, 0, 0, .72);
+  }
+  .modal.abierto { display: flex; }
+  .modal .tarjeta { width: 100%; max-width: 440px; position: relative; }
+  .modal h2 { margin: 0 0 4px; font-size: 1.15rem; }
+  .modal .cerrar {
+    position: absolute; top: 10px; right: 10px; width: 36px; height: 36px; margin: 0; padding: 0;
+    border-radius: 50%; background: var(--borde); font-size: 1.1rem; line-height: 36px;
+  }
+  .datos { margin: 14px 0 4px; display: grid; gap: 8px; }
+  .dato { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, .04); border: 1px solid var(--borde); }
+  .dato span { color: var(--gris); font-size: .82rem; min-width: 62px; }
+  .dato b { flex: 1; font-size: 1rem; word-break: break-all; }
+  .dato button { width: auto; margin: 0; padding: 7px 10px; font-size: .8rem; background: var(--borde); }
+  .comprobante img { max-width: 100%; max-height: 260px; border-radius: 10px; display: block; margin: 0 auto; }
+  .opciones { display: none; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--borde); text-align: center; }
+  .opciones p { margin: 0 0 4px; font-size: .92rem; color: var(--gris); }
+  .opciones a.boton {
+    display: block; margin-top: 10px; padding: 14px; border-radius: 12px; text-decoration: none; font-weight: 600;
+    background: #1fa855; color: #fff;
+  }
+  .opciones button.secundario { background: var(--borde); }
+</style>
+</head>
+<body>
+<main>
+  <h1><span>♦️</span> Erza-Bot-MD <span>♦️</span></h1>
+  <p class="sub">Stickers con sonido desde un video</p>
+
+  <div class="tarjeta">
+    <div class="destino"><span class="punto ok"></span><span>Hazlo y <b>mándatelo tú mismo</b> por WhatsApp</span></div>
+
+    <label class="zona" for="archivo">
+      <strong>🎬 Elige un video</strong>
+      <span id="nombre">Luego eliges el pedazo y el encuadre (hasta 20 s)</span>
+    </label>
+    <input type="file" id="archivo" accept="video/*">
+    <div class="editor" id="editor">
+      <div class="lienzo" id="lienzo">
+        <video id="vista" playsinline muted loop preload="auto"></video>
+        <div class="recuadro" id="recuadro"><i data-esq="nw"></i><i data-esq="ne"></i><i data-esq="sw"></i><i data-esq="se"></i></div>
+      </div>
+      <div class="controles">
+        <button type="button" class="icono" id="reproducir" title="Reproducir o pausar">⏸️</button>
+        <button type="button" class="icono" id="sonido" title="Activar o quitar el sonido">🔇</button>
+        <button type="button" data-modo="auto">✨ Auto</button>
+        <button type="button" data-modo="cuadrado">⬛ Cuadro</button>
+        <button type="button" data-modo="todo">🖼️ Todo</button>
+      </div>
+      <div class="tiempo">
+        <label>Empieza en <b id="tInicio">0.0 s</b><input type="range" id="inicio" min="0" max="0" step="0.1" value="0"></label>
+        <label>Dura <b id="tDura">20.0 s</b><input type="range" id="dura" min="1" max="20" step="0.1" value="20"></label>
+      </div>
+    </div>
+
+    <button id="enviar" disabled>Crear sticker</button>
+    <div class="aviso" id="aviso">⚠️ No te salgas de la página: tu teléfono está haciendo el sticker</div>
+    <div class="barra" id="barra"><i id="progreso"></i></div>
+    <div class="estado" id="estado"></div>
+
+    <div class="resultado" id="resultado">
+      <img id="vistaSticker" alt="Tu sticker">
+      <p class="sub" style="margin:8px 0 0">🧪 Prueba cuál opción te llega <b>con sonido</b>:</p>
+      <button type="button" id="prueba1">📤 Prueba 1: mandar sticker</button>
+      <button type="button" id="prueba2" class="secundario">📤 Prueba 2: sticker + audio juntos</button>
+      <button type="button" id="prueba3" class="secundario">📤 Prueba 3: sticker con el audio adentro</button>
+      <a class="boton" id="descargar" download="sticker.webp">⬇️ Descargar sticker</a>
+      <p class="nota" id="notaCompartir" style="margin-top:10px">Elige WhatsApp y mándatelo a ti mismo (o a quien quieras).</p>
+    </div>
+  </div>
+
+  <p class="nota">El sticker lo hace <b>tu teléfono</b>, sin filas ni esperas.<br>La primera vez se descarga el conversor (unos 30 MB), después ya queda guardado.</p>
+  <footer>© Mikelennn · © ErzaBot</footer>
+</main>
+
+<script type="module">
+  const $ = (id) => document.getElementById(id)
+  const archivo = $('archivo'), vista = $('vista'), enviar = $('enviar')
+  const barra = $('barra'), progreso = $('progreso'), estado = $('estado'), aviso = $('aviso')
+
+  // PRUEBA: hasta 1 MB (las reglas de paquetes dicen 500 KB; probamos si WhatsApp acepta más)
+  const MAX_BYTES = 500 * 1024 // WhatsApp solo acepta stickers animados de hasta 500 KB desde el teléfono
+  const maxSegundos = 20
+  let trabajando = false
+
+  function mostrarEstado(texto, tipo = '') {
+    estado.textContent = texto
+    estado.className = 'estado ' + tipo
+  }
+  function avance(porcentaje) {
+    barra.classList.remove('trabajando')
+    progreso.style.width = Math.max(0, Math.min(100, porcentaje)) + '%'
+  }
+  function sinPorcentaje() {
+    barra.classList.add('trabajando')
+  }
+
+  // Avisa si intenta salir mientras el teléfono hace el sticker
+  window.addEventListener('beforeunload', (e) => {
+    if (!trabajando) return
+    e.preventDefault()
+    e.returnValue = ''
+  })
+
+  // ---------- Conversor (ffmpeg.wasm) ----------
+  // El archivo pesado (31 MB) se baja de un CDN público (jsDelivr, y si falla, unpkg)
+  const CDN = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm'
+  const PROPIO = 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/esm'
+  let ffmpeg = null
+  let cargando = null
+
+  async function origenDelConversor() {
+    try {
+      const r = await fetch(`${CDN}/ffmpeg-core.js`, { method: 'HEAD', mode: 'cors', signal: AbortSignal.timeout(5000) })
+      if (r.ok) return CDN
+    } catch (e) {}
+    return PROPIO
+  }
+
+  function cargarConversor() {
+    if (!cargando) {
+      cargando = (async () => {
+        const { FFmpeg } = await import('./ffmpeg/ffmpeg/index.js')
+        const origen = await origenDelConversor()
+        let f = new FFmpeg()
+        try {
+          await f.load({ coreURL: `${origen}/ffmpeg-core.js`, wasmURL: `${origen}/ffmpeg-core.wasm` })
+        } catch (e) {
+          if (origen === PROPIO) throw e
+          f.terminate()
+          f = new FFmpeg()
+          await f.load({ coreURL: `${PROPIO}/ffmpeg-core.js`, wasmURL: `${PROPIO}/ffmpeg-core.wasm` })
+        }
+        ffmpeg = f
+        return f
+      })()
+      cargando.catch(() => (cargando = null))
+    }
+    return cargando
+  }
+
+  // 15 fps para que se vea como video; la calidad baja solo si pasa del límite
+  // Compresión nivel 2: ~35 % menos peso que el nivel 0 con la misma calidad (tarda ~1.5 veces más)
+  // Fluidez preferida y alternativas: si el video es muy difícil, baja los fps antes que pixelar
+  const OPCIONES_FPS = [12, 10, 8]
+  const CALIDAD_MINIMA = 35 // por debajo de esto se ve con bloques
+  // Cuánto pesa el sticker con cada calidad, comparado con calidad 40 (medido con videos de prueba)
+  const PESO_RELATIVO = [[60, 1.3], [50, 1.13], [40, 1], [30, 0.87], [25, 0.8], [20, 0.72], [15, 0.64], [10, 0.55], [5, 0.45], [1, 0.38]]
+  // area: escalado limpio; hqdn3d (ya en 512 px): quita el grano del video, que pesa mucho al comprimir
+  // El recorte va en fracciones del video (0 a 1), así no importa su resolución ni si está girado
+  const filtro = ({ x, y, w, h }) =>
+    `crop=iw*${w.toFixed(4)}:ih*${h.toFixed(4)}:iw*${x.toFixed(4)}:ih*${y.toFixed(4)},` +
+    // start_time=0: imagen y audio empiezan en el mismo cero (si la imagen empieza tarde, repite el primer cuadro)
+    `fps=${OPCIONES_FPS[0]}:start_time=0,scale=512:512:force_original_aspect_ratio=decrease:flags=area,hqdn3d=3:2:6:4,format=yuv420p`
+  // El relleno transparente hasta 512x512 se agrega al comprimir (así los fotogramas guardados ocupan mucho menos)
+  // Primero se activa la transparencia (yuva420p) y luego se rellena: al revés, el relleno sale negro
+  const RELLENO = 'format=yuva420p,pad=512:512:-1:-1:color=0x00000000'
+
+  // Comprime a WebP animado desde los fotogramas ya preparados (no vuelve a leer el video)
+  async function comprimir({ desde = 0, segundos, fps, calidad, salida }) {
+    const codigo = await ffmpeg.exec([
+      ...(desde > 0 ? ['-ss', desde.toFixed(2)] : []), ...(segundos ? ['-t', String(segundos)] : []), '-i', 'fotogramas.nut',
+      '-vf', fps < OPCIONES_FPS[0] ? `fps=${fps},${RELLENO}` : RELLENO,
+      '-c:v', 'libwebp_anim', '-lossless', '0', '-q:v', String(calidad), '-compression_level', '2', '-loop', '0', salida
+    ])
+    if (codigo !== 0) throw new Error('No se pudo hacer el sticker')
+    return ffmpeg.readFile(salida)
+  }
+
+  // Mejor calidad que cabe para un peso estimado (con calidad 40); -1 si ninguna
+  const mejorCalidad = (estimado40) => PESO_RELATIVO.findIndex(([, r]) => estimado40 * r <= MAX_BYTES * 0.9)
+
+  async function hacerSticker(f, { inicio, duracion, recorte }) {
+    const corte = ['-ss', inicio.toFixed(2), '-t', duracion.toFixed(2)]
+    const nombre = 'entrada' + (f.name.match(/\.\w+$/)?.[0] || '.mp4')
+    await ffmpeg.writeFile(nombre, new Uint8Array(await f.arrayBuffer()))
+
+    // 1) Audio (si el video no tiene sonido, el sticker va sin audio)
+    mostrarEstado('Sacando el sonido…')
+    sinPorcentaje()
+    let audio = null
+    // aresample first_pts=0: si el audio empieza tarde en el archivo, pone silencio al inicio (no lo adelanta)
+    const codigoAudio = await ffmpeg.exec([...corte, '-i', nombre, '-vn', '-map', '0:a:0', '-af', 'aresample=async=1:first_pts=0,apad',
+      '-t', duracion.toFixed(2), '-ac', '1', '-c:a', 'libopus', '-b:a', '48k', 'audio.ogg'])
+    if (codigoAudio === 0) {
+      audio = await ffmpeg.readFile('audio.ogg')
+      if (audio.length < 200) audio = null
+    }
+
+    // 2) Lee el video UNA sola vez: fotogramas ya en 512 px y sin grano
+    mostrarEstado('Leyendo el video…')
+    const alProgresar = ({ time }) => {
+      if (time > 0) avance(((time / 1e6) / duracion) * 100)
+    }
+    ffmpeg.on('progress', alProgresar)
+    let codigo
+    try {
+      codigo = await ffmpeg.exec([...corte, '-i', nombre, '-an', '-vf', filtro(recorte), '-t', duracion.toFixed(2), '-c:v', 'rawvideo', '-f', 'nut', 'fotogramas.nut'])
+    } finally {
+      ffmpeg.off('progress', alProgresar)
+    }
+    await ffmpeg.deleteFile(nombre).catch(() => {}) // libera memoria: ya no hace falta el video
+    if (codigo !== 0) throw new Error('No se pudo leer ese video')
+
+    // 3) Calibración con 3 pedacitos (principio, mitad y final) para que el cálculo valga para todo el video
+    mostrarEstado('Calculando la mejor calidad…')
+    sinPorcentaje()
+    const largo = Math.min(1, duracion)
+    const puntos = [...new Set([0, duracion / 2 - largo / 2, duracion - largo - 0.1].map((t) => Math.max(0, Math.round(t * 10) / 10)))]
+    let pesoTotal = 0
+    for (const desde of puntos) {
+      pesoTotal += (await comprimir({ desde, segundos: largo, fps: OPCIONES_FPS[0], calidad: 40, salida: 'muestra.webp' })).length
+    }
+    const porSegundo = pesoTotal / (puntos.length * largo)
+
+    // 4) Elige los fps más altos que permitan calidad >= CALIDAD_MINIMA; si ninguno, el más bajo
+    let fps = OPCIONES_FPS[OPCIONES_FPS.length - 1]
+    let indice = -1
+    for (const opcion of OPCIONES_FPS) {
+      const i = mejorCalidad(porSegundo * (opcion / OPCIONES_FPS[0]) * duracion)
+      if (i >= 0 && PESO_RELATIVO[i][0] >= CALIDAD_MINIMA) {
+        fps = opcion
+        indice = i
+        break
+      }
+    }
+    if (indice < 0) {
+      const i = mejorCalidad(porSegundo * (fps / OPCIONES_FPS[0]) * duracion)
+      indice = i >= 0 ? i : PESO_RELATIVO.length - 1
+    }
+
+    // 5) El sticker completo (normalmente una sola vez)
+    let sticker = null
+    let intentos = 0
+    for (let i = indice; i < PESO_RELATIVO.length; i++) {
+      intentos++
+      mostrarEstado(i === indice ? 'Haciendo el sticker…' : 'Ajustando el peso del sticker…')
+      sticker = await comprimir({ fps, calidad: PESO_RELATIVO[i][0], salida: 'sticker.webp' })
+      if (sticker.length <= MAX_BYTES) {
+        console.info(`[sticker] ${fps} fps, calidad ${PESO_RELATIVO[i][0]}, ${intentos} intento(s), ${Math.round(sticker.length / 1024)} KB`)
+        break
+      }
+      // Si se pasó, salta a la calidad que debería caber según lo que pesó de verdad
+      const necesario = (MAX_BYTES * 0.9) / sticker.length * PESO_RELATIVO[i][1]
+      const siguiente = PESO_RELATIVO.findIndex(([, r]) => r <= necesario)
+      if (siguiente > i) i = siguiente - 1
+    }
+
+    for (const n of [nombre, 'fotogramas.nut', 'muestra.webp', 'sticker.webp', 'audio.ogg']) await ffmpeg.deleteFile(n).catch(() => {})
+    return { sticker, audio, segundos: duracion }
+  }
+
+  // ---------- Datos del sticker (nombre del paquete y autor que muestra WhatsApp) ----------
+  const PAQUETE = '♦️ Erza-Bot-MD ♦️\n'
+  const AUTOR = 'mikelennn'
+  const ascii = (b, i) => String.fromCharCode(b[i], b[i + 1], b[i + 2], b[i + 3])
+  const u32 = (n) => { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, n, true); return b }
+  const juntar = (partes) => {
+    const total = partes.reduce((n, p) => n + p.length, 0)
+    const out = new Uint8Array(total); let k = 0
+    for (const p of partes) { out.set(p, k); k += p.length }
+    return out
+  }
+  // Rearma el WebP con bloques extra al final (EXIF con los datos y, si se pide, el audio)
+  function armarWebp(webp, extras) {
+    if (ascii(webp, 0) !== 'RIFF' || ascii(webp, 8) !== 'WEBP') return webp
+    const dv = new DataView(webp.buffer, webp.byteOffset, webp.byteLength)
+    const bloques = []
+    let i = 12
+    while (i + 8 <= webp.length) {
+      const tipo = ascii(webp, i), tam = dv.getUint32(i + 4, true), fin = i + 8 + tam + (tam % 2)
+      const bloque = webp.slice(i, Math.min(fin, webp.length))
+      if (tipo === 'VP8X') bloque[8] |= 0x08
+      if (tipo !== 'EXIF') bloques.push(bloque)
+      i = fin
+    }
+    if (!bloques.some((b) => ascii(b, 0) === 'VP8X')) return webp
+    for (const [tipo, datos] of extras) {
+      bloques.push(juntar([new TextEncoder().encode(tipo), u32(datos.length), datos, new Uint8Array(datos.length % 2)]))
+    }
+    const cuerpo = juntar(bloques)
+    return juntar([new TextEncoder().encode('RIFF'), u32(cuerpo.length + 4), new TextEncoder().encode('WEBP'), cuerpo])
+  }
+  function exif() {
+    const json = new TextEncoder().encode(JSON.stringify({
+      'sticker-pack-id': 'erza-bot-md-stickers', 'sticker-pack-name': PAQUETE, 'sticker-pack-publisher': AUTOR, emojis: ['♦️']
+    }))
+    const cab = new Uint8Array([0x49, 0x49, 0x2a, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00, 0x41, 0x57, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x00])
+    cab.set(u32(json.length), 14)
+    return juntar([cab, json])
+  }
+
+  // ---------- Compartir (cada quien se lo manda a sí mismo) ----------
+  let hecho = null // { sticker: File, conAudio: File, audio: File }
+  async function compartir(archivos) {
+    if (!(navigator.canShare && navigator.canShare({ files: archivos }))) {
+      mostrarEstado('Tu navegador no deja compartir eso. Usa "Descargar sticker".', 'error')
+      return
+    }
+    try { await navigator.share({ files: archivos }) } catch (e) {}
+  }
+  $('prueba1').addEventListener('click', () => hecho && compartir([hecho.sticker]))
+  $('prueba2').addEventListener('click', () => {
+    if (!hecho) return
+    if (!hecho.audio) return mostrarEstado('Ese video no tiene sonido', 'error')
+    compartir([hecho.sticker, hecho.audio])
+  })
+  $('prueba3').addEventListener('click', () => hecho && compartir([hecho.conAudio]))
+
+  function mostrarResultado({ sticker, audio }) {
+    const webp = armarWebp(sticker, [['EXIF', exif()]])
+    const conAudio = audio ? armarWebp(sticker, [['EXIF', exif()], ['OGGS', audio]]) : webp
+    const nombre = 'sticker-erzabot-' + Date.now()
+    hecho = {
+      sticker: new File([webp], nombre + '.webp', { type: 'image/webp' }),
+      conAudio: new File([conAudio], nombre + '-audio.webp', { type: 'image/webp' }),
+      audio: audio ? new File([audio], nombre + '.ogg', { type: 'audio/ogg' }) : null
+    }
+    const url = URL.createObjectURL(hecho.sticker)
+    $('vistaSticker').src = url
+    $('descargar').href = url
+    $('descargar').download = hecho.sticker.name
+    $('prueba2').hidden = $('prueba3').hidden = !audio
+    $('resultado').style.display = 'block'
+    $('resultado').scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  // ---------- Editor: tiempo y encuadre ----------
+  const editor = $('editor'), lienzo = $('lienzo'), recuadro = $('recuadro')
+  const inicio = $('inicio'), dura = $('dura')
+  let recorte = { x: 0, y: 0, w: 1, h: 1 } // fracciones del video
+  let sinBordes = { x: 0, y: 0, w: 1, h: 1 } // zona útil detectada (sin franjas negras)
+  let modo = 'auto'
+  let videoElegido = null // copia en memoria del video elegido
+
+  function pintarRecuadro() {
+    Object.assign(recuadro.style, {
+      left: recorte.x * 100 + '%', top: recorte.y * 100 + '%', width: recorte.w * 100 + '%', height: recorte.h * 100 + '%'
+    })
+    for (const b of document.querySelectorAll('[data-modo]')) b.classList.toggle('activo', b.dataset.modo === modo)
+  }
+
+  // Tamaño del lienzo con la forma exacta del video (así el recuadro coincide con la imagen)
+  function ajustarLienzo() {
+    const ancho = lienzo.parentElement.clientWidth
+    const proporcion = vista.videoWidth / vista.videoHeight || 1
+    const alto = Math.min(ancho / proporcion, window.innerHeight * 0.55)
+    lienzo.style.width = alto * proporcion + 'px'
+    lienzo.style.height = alto + 'px'
+  }
+  window.addEventListener('resize', () => editor.style.display === 'block' && ajustarLienzo())
+
+  // Busca franjas negras mirando 3 fotogramas del video
+  async function detectarBordes() {
+    const W = 160
+    const H = Math.max(1, Math.round((W * vista.videoHeight) / vista.videoWidth))
+    const lienzoTmp = document.createElement('canvas')
+    lienzoTmp.width = W
+    lienzoTmp.height = H
+    const ctx = lienzoTmp.getContext('2d', { willReadFrequently: true })
+    let arriba = H, abajo = -1, izq = W, der = -1
+    for (const t of [0.15, 0.5, 0.85]) {
+      await new Promise((r) => {
+        vista.addEventListener('seeked', r, { once: true })
+        vista.currentTime = Math.min(vista.duration - 0.05, vista.duration * t)
+        setTimeout(r, 1500)
+      })
+      ctx.drawImage(vista, 0, 0, W, H)
+      const { data } = ctx.getImageData(0, 0, W, H)
+      const claro = (i) => 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2] > 28
+      // Una fila o columna cuenta como contenido si tiene suficientes puntos no negros
+      for (let y = 0; y < H; y++) {
+        let n = 0
+        for (let x = 0; x < W; x++) if (claro((y * W + x) * 4)) n++
+        if (n > W * 0.04) { arriba = Math.min(arriba, y); abajo = Math.max(abajo, y) }
+      }
+      for (let x = 0; x < W; x++) {
+        let n = 0
+        for (let y = 0; y < H; y++) if (claro((y * W + x) * 4)) n++
+        if (n > H * 0.04) { izq = Math.min(izq, x); der = Math.max(der, x) }
+      }
+    }
+    if (abajo < 0 || der < 0) return { x: 0, y: 0, w: 1, h: 1 } // todo negro: no se toca
+    // Un píxel de margen en los lados recortados para que no quede ninguna línea negra
+    if (arriba > 0) arriba++
+    if (abajo < H - 1) abajo--
+    if (izq > 0) izq++
+    if (der < W - 1) der--
+    const zona = { x: izq / W, y: arriba / H, w: (der - izq + 1) / W, h: (abajo - arriba + 1) / H }
+    if (zona.w * zona.h < 0.2) return { x: 0, y: 0, w: 1, h: 1 } // algo raro: mejor no recortar
+    return zona
+  }
+
+  function aplicarModo(nuevo) {
+    modo = nuevo
+    if (modo === 'todo') recorte = { x: 0, y: 0, w: 1, h: 1 }
+    else if (modo === 'auto') recorte = { ...sinBordes }
+    else {
+      // Cuadrado lo más grande posible, centrado dentro de la zona sin bordes
+      const vw = vista.videoWidth, vh = vista.videoHeight
+      const lado = Math.min(sinBordes.w * vw, sinBordes.h * vh)
+      const w = lado / vw, h = lado / vh
+      recorte = { x: sinBordes.x + (sinBordes.w - w) / 2, y: sinBordes.y + (sinBordes.h - h) / 2, w, h }
+    }
+    pintarRecuadro()
+  }
+  for (const b of document.querySelectorAll('[data-modo]')) b.addEventListener('click', () => aplicarModo(b.dataset.modo))
+
+  // Mover el recuadro o cambiar su tamaño desde las esquinas
+  let arrastre = null
+  recuadro.addEventListener('pointerdown', (e) => {
+    e.preventDefault()
+    recuadro.setPointerCapture(e.pointerId)
+    arrastre = { esquina: e.target.dataset.esq || null, x0: e.clientX, y0: e.clientY, inicial: { ...recorte } }
+  })
+  recuadro.addEventListener('pointermove', (e) => {
+    if (!arrastre) return
+    const caja = lienzo.getBoundingClientRect()
+    const dx = (e.clientX - arrastre.x0) / caja.width
+    const dy = (e.clientY - arrastre.y0) / caja.height
+    const r = { ...arrastre.inicial }
+    const MIN = 0.1
+    if (!arrastre.esquina) {
+      r.x = Math.min(Math.max(0, r.x + dx), 1 - r.w)
+      r.y = Math.min(Math.max(0, r.y + dy), 1 - r.h)
+    } else {
+      const e2 = arrastre.esquina
+      if (e2.includes('w')) { const nx = Math.min(Math.max(0, r.x + dx), r.x + r.w - MIN); r.w += r.x - nx; r.x = nx }
+      if (e2.includes('e')) r.w = Math.min(Math.max(MIN, r.w + dx), 1 - r.x)
+      if (e2.includes('n')) { const ny = Math.min(Math.max(0, r.y + dy), r.y + r.h - MIN); r.h += r.y - ny; r.y = ny }
+      if (e2.includes('s')) r.h = Math.min(Math.max(MIN, r.h + dy), 1 - r.y)
+    }
+    recorte = r
+    modo = 'manual'
+    pintarRecuadro()
+  })
+  const soltar = () => (arrastre = null)
+  recuadro.addEventListener('pointerup', soltar)
+  recuadro.addEventListener('pointercancel', soltar)
+
+  // Tiempo: desde dónde empieza y cuánto dura (máx. 10 s). La vista previa repite solo ese pedazo
+  function actualizarTiempo() {
+    const total = vista.duration || 0
+    inicio.max = Math.max(0, total - 0.5).toFixed(1)
+    const ini = Math.min(Number(inicio.value), Number(inicio.max))
+    const maxDura = Math.max(0.5, Math.min(maxSegundos, total - ini))
+    dura.max = maxDura.toFixed(1)
+    dura.min = Math.min(1, maxDura).toFixed(1)
+    if (Number(dura.value) > maxDura) dura.value = maxDura.toFixed(1)
+    $('tInicio').textContent = ini.toFixed(1) + ' s'
+    $('tDura').textContent = Number(dura.value).toFixed(1) + ' s'
+  }
+  const tramo = () => ({ desde: Number(inicio.value), hasta: Number(inicio.value) + Number(dura.value) })
+  inicio.addEventListener('input', () => { actualizarTiempo(); vista.currentTime = tramo().desde })
+  dura.addEventListener('input', actualizarTiempo)
+  vista.addEventListener('timeupdate', () => {
+    const { desde, hasta } = tramo()
+    if (vista.currentTime >= hasta || vista.currentTime < desde - 0.3) vista.currentTime = desde
+  })
+  $('reproducir').addEventListener('click', () => (vista.paused ? vista.play() : vista.pause()))
+  vista.addEventListener('play', () => ($('reproducir').textContent = '⏸️'))
+  vista.addEventListener('pause', () => ($('reproducir').textContent = '▶️'))
+  $('sonido').addEventListener('click', () => {
+    vista.muted = !vista.muted
+    $('sonido').textContent = vista.muted ? '🔇' : '🔊'
+  })
+
+  // ---------- Elegir video ----------
+  archivo.addEventListener('change', async () => {
+    const f = archivo.files[0]
+    mostrarEstado('')
+    if (!f) return
+    if (!f.type.startsWith('video/')) { mostrarEstado('Ese archivo no es un video', 'error'); archivo.value = ''; return }
+    $('nombre').textContent = f.name
+    enviar.disabled = true
+    $('resultado').style.display = 'none'
+    cargarConversor().catch(() => {}) // empieza a descargar el conversor mientras eligen
+
+    // Copia el video a la memoria de la página YA: en Android, Chrome puede quitar el permiso
+    // de leer el archivo original al rato ("The requested file could not be read")
+    try {
+      videoElegido = new File([await f.arrayBuffer()], f.name, { type: f.type })
+    } catch (e) {
+      videoElegido = null
+      mostrarEstado('No se pudo abrir ese video, vuelve a elegirlo', 'error')
+      return
+    }
+    if (vista.src) URL.revokeObjectURL(vista.src)
+    vista.src = URL.createObjectURL(videoElegido)
+    await new Promise((r) => {
+      vista.addEventListener('loadeddata', r, { once: true })
+      vista.addEventListener('error', r, { once: true })
+    })
+    if (!vista.videoWidth) { mostrarEstado('No se pudo abrir ese video', 'error'); return }
+    editor.style.display = 'block'
+    ajustarLienzo()
+    inicio.value = 0
+    actualizarTiempo() // primero fija el máximo según el video
+    dura.value = dura.max // y luego usa todo lo que se pueda (hasta 20 s)
+    actualizarTiempo()
+
+    mostrarEstado('Revisando bordes negros…')
+    sinBordes = await detectarBordes().catch(() => ({ x: 0, y: 0, w: 1, h: 1 }))
+    const recortado = sinBordes.w < 0.98 || sinBordes.h < 0.98
+    aplicarModo('auto')
+    vista.currentTime = 0
+    vista.play().catch(() => {})
+    enviar.disabled = false
+    mostrarEstado(recortado ? '✂️ Le quité los bordes negros. Ajusta el recuadro si quieres.' : 'Ajusta el recuadro y el tiempo si quieres.')
+  })
+
+  enviar.addEventListener('click', async () => {
+    const f = videoElegido
+    if (!f) return
+    $('resultado').style.display = 'none'
+    trabajando = true
+    enviar.disabled = true
+    archivo.disabled = true
+    aviso.style.display = 'block'
+    barra.style.display = 'block'
+    try {
+      if (!ffmpeg) {
+        mostrarEstado('Preparando el conversor (solo la primera vez)…')
+        sinPorcentaje()
+        try {
+          await cargarConversor()
+        } catch (e) {
+          throw new Error('Tu teléfono o navegador no puede hacer stickers aquí')
+        }
+      }
+      vista.pause()
+      editor.classList.add('bloqueado')
+      const resultado = await hacerSticker(f, { inicio: tramo().desde, duracion: Number(dura.value), recorte })
+      mostrarEstado('✅ ¡Listo! Ahora mándatelo por WhatsApp', 'ok')
+      mostrarResultado(resultado)
+      $('nombre').textContent = 'Toca aquí para hacer otro sticker'
+    } catch (e) {
+      const msg = String(e?.message || e)
+      const texto = /could not be read|NotReadable|permission/i.test(msg)
+        ? 'No se pudo leer el video, vuelve a elegirlo'
+        : /memory|abort|RuntimeError/i.test(msg) ? 'Tu teléfono no pudo hacer el sticker con ese video' : msg
+      mostrarEstado('❌ ' + texto, 'error')
+    } finally {
+      trabajando = false
+      aviso.style.display = 'none'
+      barra.style.display = 'none'
+      archivo.disabled = false
+      editor.classList.remove('bloqueado')
+      enviar.disabled = !videoElegido
+    }
+  })
+
+</script>
+</body>
+</html>
