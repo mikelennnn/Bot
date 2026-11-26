@@ -1,0 +1,9 @@
+[
+ {"id":"gancho","src":[55.9,58.5],"paso":0,"texto":"Esto es un sticker... ¡que suena! Y lo hice en menos de un minuto. Te enseño."},
+ {"id":"paso1","src":[0.0,6.6],"paso":1,"texto":"Paso uno: únete al grupo. El link y el código están al final del video."},
+ {"id":"paso2","src":[14.6,22.5],"paso":2,"texto":"Paso dos: abre la página y elige un video de tu galería. Hasta uno de TikTok sirve."},
+ {"id":"paso3","src":[22.5,36.0],"paso":3,"texto":"Paso tres: mueve el recuadro para recortarlo, y escoge de qué segundo a qué segundo. Hasta veinte segundos."},
+ {"id":"crear","src":[36.0,48.5],"paso":4,"texto":"Paso cuatro: dale a crear, y no te salgas de la página mientras se hace."},
+ {"id":"cierre","src":[54.0,58.5],"paso":5,"texto":"Y listo: tu sticker llega solito al grupo, con todo y sonido."},
+ {"id":"final","src":[],"paso":5,"texto":"Escanea el código, o busca el link en los comentarios. ¡Nos vemos allá!"}
+]
