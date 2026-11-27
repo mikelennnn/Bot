@@ -17,6 +17,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const CARPETA_SESION = process.env.SESION_DIR || path.join(__dirname, 'sesion_bot')
 const PREFIJO = '#'
 
+// Borra la sesión del número anterior (+52 294 199 2629), que ya no se usa
+const SESION_VIEJA = '/data/sesion_erzabot'
+if (path.resolve(CARPETA_SESION) !== SESION_VIEJA && fs.existsSync(SESION_VIEJA)) {
+  fs.rmSync(SESION_VIEJA, { recursive: true, force: true })
+  console.log('🗑️ Sesión del número anterior borrada')
+}
+
 // Grupos donde el bot no responde a nada (códigos de sus enlaces de invitación)
 const GRUPOS_IGNORADOS = ['GDQuWpvGBbWI4JcpNKghzG', 'CpIIZ50p0gsBmyI7FQraBT']
 const jidsIgnorados = new Set()
