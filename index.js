@@ -10,7 +10,7 @@ import readline from 'readline'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
-import { iniciarWeb, actualizarConexion, prepararGrupo } from './lib/web.js'
+import { iniciarWeb, actualizarConexion, prepararCanal } from './lib/web.js'
 import { datosGrupoGuardados, escucharGrupos, cacheDispositivos, recibosRapidos, contarNodos } from './lib/cache.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -115,7 +115,7 @@ async function iniciar() {
       console.log('✅ Bot conectado')
       cargarGruposIgnorados(sock)
       actualizarConexion(sock)
-      prepararGrupo(sock)
+      prepararCanal(sock)
     }
 
     if (connection === 'close') {

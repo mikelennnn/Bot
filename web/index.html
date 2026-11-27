@@ -523,7 +523,7 @@
       if (d.error) throw new Error(d.error)
       if (d.estado === 'listo') return d.mensaje
       if (d.estado === 'error') throw new Error(d.mensaje)
-      mostrarEstado(d.antes > 0 ? `Sticker listo, esperando turno para mandarse (${d.antes} antes)…` : 'Mandando tu sticker al grupo…')
+      mostrarEstado(d.antes > 0 ? `Sticker listo, esperando turno para mandarse (${d.antes} antes)…` : 'Mandando tu sticker al canal…')
     }
   }
 
