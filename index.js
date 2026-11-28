@@ -176,7 +176,7 @@ if (APAGADO) {
   http
     .createServer((req, res) => {
       if (req.url.startsWith('/api/')) {
-        res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
+        res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' })
         return res.end(JSON.stringify({ error: 'El bot está apagado por ahora, vuelve más tarde' }))
       }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })

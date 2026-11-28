@@ -148,6 +148,9 @@
 
 <script type="module">
   const $ = (id) => document.getElementById(id)
+  // La página puede estar en Vercel o en el propio bot: los stickers siempre van al bot
+  const BOT = 'https://or81eiv6z8c6-production-x4lcttoj.us-central1.suga.run'
+  const API = location.origin === BOT ? '' : BOT
   const archivo = $('archivo'), vista = $('vista'), enviar = $('enviar')
   const barra = $('barra'), progreso = $('progreso'), estado = $('estado'), aviso = $('aviso')
 
@@ -192,7 +195,7 @@
   // ---------- Estado del bot ----------
   async function info() {
     try {
-      const d = await (await fetch('/api/info?cliente=' + encodeURIComponent(CLIENTE), { cache: 'no-store' })).json()
+      const d = await (await fetch(API + '/api/info?cliente=' + encodeURIComponent(CLIENTE), { cache: 'no-store' })).json()
       pendiente = d.pendiente || null
       conectado = d.conectado
       maxSegundos = d.maxSegundos || 20
@@ -211,7 +214,7 @@
   // El archivo pesado (31 MB) se baja de un CDN público para no gastar el tráfico del bot.
   // Si el CDN no responde, se baja del propio bot.
   const CDN = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm'
-  const PROPIO = '/ffmpeg/core'
+  const PROPIO = API + '/ffmpeg/core'
   let ffmpeg = null
   let cargando = null
 
@@ -226,7 +229,7 @@
   function cargarConversor() {
     if (!cargando) {
       cargando = (async () => {
-        const { FFmpeg } = await import('/ffmpeg/ffmpeg/index.js')
+        const { FFmpeg } = await import('./ffmpeg/ffmpeg/index.js')
         const origen = await origenDelConversor()
         let f = new FFmpeg()
         try {
@@ -362,7 +365,7 @@
     for (let intento = 1; ; intento++) {
       let r
       try {
-        r = await fetch('/api/sticker', {
+        r = await fetch(API + '/api/sticker', {
           method: 'POST',
           headers: { 'Content-Type': 'application/octet-stream', 'X-Cliente': CLIENTE, 'X-Tam-Sticker': String(sticker.length), 'X-Segundos': String(segundos) },
           body: new Blob(audio ? [sticker, audio] : [sticker])
@@ -389,7 +392,7 @@
       await new Promise((r) => setTimeout(r, 1500))
       let d
       try {
-        d = await (await fetch('/api/estado?id=' + encodeURIComponent(id), { cache: 'no-store' })).json()
+        d = await (await fetch(API + '/api/estado?id=' + encodeURIComponent(id), { cache: 'no-store' })).json()
       } catch (e) { continue }
       if (d.error) throw new Error(d.error)
       if (d.estado === 'listo') return d.mensaje
