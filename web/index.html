@@ -101,6 +101,12 @@
   .estado { margin-top: 12px; min-height: 1.4em; text-align: center; font-size: .95rem; color: var(--gris); }
   .estado.ok { color: var(--verde); font-weight: 600; }
   .estado.error { color: var(--rojo-claro); }
+  .listo { display: none; margin-top: 14px; padding: 14px; border-radius: 14px; text-align: center;
+    background: rgba(62, 207, 110, .08); border: 1px solid rgba(62, 207, 110, .45); }
+  .listo b { color: var(--verde); font-size: 1.02rem; }
+  .listo p { margin: 8px 0 0; font-size: .92rem; line-height: 1.45; color: var(--texto); }
+  .listo p b { color: var(--texto); font-size: inherit; }
+  .listo a.boton { display: block; margin-top: 12px; padding: 13px; border-radius: 12px; text-decoration: none; font-weight: 700; background: #1fa855; color: #fff; }
   .nota { color: var(--gris); font-size: .82rem; text-align: center; margin-top: 16px; line-height: 1.5; }
   footer { text-align: center; color: var(--gris); font-size: .8rem; margin-top: 22px; }
 </style>
@@ -140,6 +146,11 @@
     <div class="aviso" id="aviso">⚠️ No te salgas de la página: tu teléfono está haciendo el sticker</div>
     <div class="barra" id="barra"><i id="progreso"></i></div>
     <div class="estado" id="estado"></div>
+    <div class="listo" id="listo">
+      <b>✅ ¡Listo! Tu sticker se mandará en un momento</b>
+      <p>Puede tardar entre <b>1 y 5 minutos</b>. Ya puedes salir de la página: fíjate en el canal.</p>
+      <a class="boton" href="https://whatsapp.com/channel/0029VbEF7u28fewkqNbwFC09" target="_blank" rel="noopener">📢 Unirme al canal</a>
+    </div>
   </div>
 
   <p class="nota">El sticker lo hace <b>tu teléfono</b>, así no hay que esperar fila.<br>La primera vez se descarga el conversor (unos 30 MB), después ya queda guardado.</p>
@@ -387,19 +398,7 @@
     }
   }
 
-  async function esperarEnvio(id) {
-    while (true) {
-      await new Promise((r) => setTimeout(r, 1500))
-      let d
-      try {
-        d = await (await fetch(API + '/api/estado?id=' + encodeURIComponent(id), { cache: 'no-store' })).json()
-      } catch (e) { continue }
-      if (d.error) throw new Error(d.error)
-      if (d.estado === 'listo') return d.mensaje
-      if (d.estado === 'error') throw new Error(d.mensaje)
-      mostrarEstado(d.antes > 0 ? `Sticker listo, esperando turno para mandarse (${d.antes} antes)…` : 'Mandando tu sticker al canal…')
-    }
-  }
+
 
   // ---------- Editor: tiempo y encuadre ----------
   const editor = $('editor'), lienzo = $('lienzo'), recuadro = $('recuadro')
@@ -545,6 +544,7 @@
   archivo.addEventListener('change', async () => {
     const f = archivo.files[0]
     mostrarEstado('')
+    $('listo').style.display = 'none'
     if (!f) return
     if (!f.type.startsWith('video/')) { mostrarEstado('Ese archivo no es un video', 'error'); archivo.value = ''; return }
     $('nombre').textContent = f.name
@@ -613,13 +613,14 @@
 
       mostrarEstado('Mandando el sticker al bot…')
       sinPorcentaje()
-      const id = await mandar(resultado)
+      await mandar(resultado)
 
       // Ya está en el bot: aunque se salga, se manda igual
       trabajando = false
       aviso.style.display = 'none'
-      const mensaje = await esperarEnvio(id)
-      mostrarEstado('✅ ' + mensaje, 'ok')
+      mostrarEstado('')
+      $('listo').style.display = 'block'
+      $('listo').scrollIntoView({ behavior: 'smooth', block: 'nearest' })
       archivo.value = ''
       videoElegido = null
       editor.style.display = 'none'
