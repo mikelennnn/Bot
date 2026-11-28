@@ -110,6 +110,9 @@
   .listo p { margin: 8px 0 0; font-size: .92rem; line-height: 1.45; color: var(--texto); }
   .listo p b { color: var(--texto); font-size: inherit; }
   .listo a.boton { display: block; margin-top: 12px; padding: 13px; border-radius: 12px; text-decoration: none; font-weight: 700; background: #1fa855; color: #fff; }
+  .prohibido { margin: -10px 0 16px; padding: 9px 12px; border-radius: 12px; text-align: center; font-size: .88rem;
+    background: rgba(224, 36, 58, .12); border: 1px solid rgba(224, 36, 58, .5); color: #ffd6db; }
+  .prohibido b { color: #fff; }
   .nota { color: var(--gris); font-size: .82rem; text-align: center; margin-top: 16px; line-height: 1.5; }
   footer { text-align: center; color: var(--gris); font-size: .8rem; margin-top: 22px; }
 </style>
@@ -118,6 +121,7 @@
 <main>
   <h1><span>♦️</span> Erza-Bot-MD <span>♦️</span></h1>
   <p class="sub">Stickers con sonido desde un video</p>
+  <p class="prohibido">🚫 Prohibido porno o gore: <b>se bloquea a quien lo mande</b></p>
 
   <div class="tarjeta">
     <div class="destino"><span class="punto" id="punto"></span><span id="destino">Conectando con el bot…</span><span class="fila" id="fila"></span></div>
@@ -403,6 +407,63 @@
 
 
 
+  // ---------- Detector de contenido prohibido (porno) ----------
+  // Corre en el teléfono (NSFWJS). Mira 5 cuadros del pedazo elegido antes de hacer el sticker.
+  const NSFW = 'https://cdn.jsdelivr.net/npm/nsfwjs@4.3.0/dist'
+  let detector = null
+  const cargarScript = (src) => new Promise((ok, mal) => {
+    const s = document.createElement('script')
+    s.src = src
+    s.onload = ok
+    s.onerror = mal
+    document.head.appendChild(s)
+  })
+  function cargarDetector() {
+    if (!detector) {
+      detector = (async () => {
+        await cargarScript(`${NSFW}/models/mobilenet_v2/model.min.js`)
+        await cargarScript(`${NSFW}/models/mobilenet_v2/group1-shard1of1.min.js`)
+        await cargarScript(`${NSFW}/browser/nsfwjs.min.js`)
+        return window.nsfwjs.load('MobileNetV2')
+      })()
+      detector.catch(() => (detector = null))
+    }
+    return detector
+  }
+
+  // true si parece porno: un cuadro muy claro o dos dudosos
+  async function esProhibido() {
+    let modelo
+    try {
+      modelo = await cargarDetector()
+    } catch (e) {
+      console.warn('[detector] no se pudo cargar', e)
+      return false // si no carga, no se le impide a la gente hacer su sticker
+    }
+    const lienzoTmp = document.createElement('canvas')
+    lienzoTmp.width = lienzoTmp.height = 224
+    const ctx = lienzoTmp.getContext('2d')
+    const { desde, hasta } = tramo()
+    const vw = vista.videoWidth, vh = vista.videoHeight
+    let dudosos = 0
+    for (let k = 0; k < 5; k++) {
+      await new Promise((r) => {
+        vista.addEventListener('seeked', r, { once: true })
+        vista.currentTime = Math.min(vista.duration - 0.05, desde + ((hasta - desde) * (k + 0.5)) / 5)
+        setTimeout(r, 1500)
+      })
+      ctx.fillStyle = '#000'
+      ctx.fillRect(0, 0, 224, 224)
+      ctx.drawImage(vista, recorte.x * vw, recorte.y * vh, recorte.w * vw, recorte.h * vh, 0, 0, 224, 224)
+      const p = Object.fromEntries((await modelo.classify(lienzoTmp, 5)).map((x) => [x.className, x.probability]))
+      const malo = (p.Porn || 0) + (p.Hentai || 0)
+      if (malo >= 0.9) return true
+      if (malo >= 0.6) dudosos++
+      if (dudosos >= 2) return true
+    }
+    return false
+  }
+
   // ---------- Editor: tiempo y encuadre ----------
   const editor = $('editor'), lienzo = $('lienzo'), recuadro = $('recuadro')
   const inicio = $('inicio'), dura = $('dura')
@@ -553,6 +614,7 @@
     $('nombre').textContent = f.name
     enviar.disabled = true
     cargarConversor().catch(() => {}) // empieza a descargar el conversor mientras eligen
+    cargarDetector().catch(() => {}) // y el detector de contenido prohibido
 
     // Copia el video a la memoria de la página YA: en Android, Chrome puede quitar el permiso
     // de leer el archivo original al rato ("The requested file could not be read")
@@ -612,6 +674,9 @@
       }
       vista.pause()
       editor.classList.add('bloqueado')
+      mostrarEstado('Revisando el video…')
+      sinPorcentaje()
+      if (await esProhibido()) throw new Error('Ese video parece tener contenido prohibido (porno). No se puede mandar.')
       const resultado = await hacerSticker(f, { inicio: tramo().desde, duracion: Number(dura.value), recorte })
 
       mostrarEstado('Mandando el sticker al bot…')
