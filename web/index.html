@@ -103,54 +103,12 @@
   .estado.error { color: var(--rojo-claro); }
   .nota { color: var(--gris); font-size: .82rem; text-align: center; margin-top: 16px; line-height: 1.5; }
   footer { text-align: center; color: var(--gris); font-size: .8rem; margin-top: 22px; }
-  /* ---------- Prioridad (pago) ---------- */
-  .prioridad {
-    margin-bottom: 16px; padding: 14px 16px; border-radius: 16px; text-align: center;
-    background: linear-gradient(135deg, rgba(255, 201, 77, .14), rgba(224, 36, 58, .12));
-    border: 1px solid rgba(255, 201, 77, .5);
-  }
-  .prioridad h2 { margin: 0 0 6px; font-size: 1.05rem; color: var(--amarillo); }
-  .prioridad p { margin: 0; font-size: .9rem; line-height: 1.45; color: var(--texto); }
-  .prioridad .mx { display: inline-block; margin-top: 8px; font-size: .8rem; color: var(--gris); }
-  .prioridad button { margin-top: 10px; padding: 11px; font-size: .98rem; background: var(--amarillo); color: #2a1a00; }
-  .prioridad button:hover:not(:disabled) { background: #ffd877; }
-  .modal {
-    position: fixed; inset: 0; z-index: 50; display: none; align-items: flex-start; justify-content: center;
-    padding: 24px 16px; overflow-y: auto; background: rgba(0, 0, 0, .72);
-  }
-  .modal.abierto { display: flex; }
-  .modal .tarjeta { width: 100%; max-width: 440px; position: relative; }
-  .modal h2 { margin: 0 0 4px; font-size: 1.15rem; }
-  .modal .cerrar {
-    position: absolute; top: 10px; right: 10px; width: 36px; height: 36px; margin: 0; padding: 0;
-    border-radius: 50%; background: var(--borde); font-size: 1.1rem; line-height: 36px;
-  }
-  .datos { margin: 14px 0 4px; display: grid; gap: 8px; }
-  .dato { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, .04); border: 1px solid var(--borde); }
-  .dato span { color: var(--gris); font-size: .82rem; min-width: 62px; }
-  .dato b { flex: 1; font-size: 1rem; word-break: break-all; }
-  .dato button { width: auto; margin: 0; padding: 7px 10px; font-size: .8rem; background: var(--borde); }
-  .comprobante img { max-width: 100%; max-height: 260px; border-radius: 10px; display: block; margin: 0 auto; }
-  .opciones { display: none; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--borde); text-align: center; }
-  .opciones p { margin: 0 0 4px; font-size: .92rem; color: var(--gris); }
-  .opciones a.boton {
-    display: block; margin-top: 10px; padding: 14px; border-radius: 12px; text-decoration: none; font-weight: 600;
-    background: #1fa855; color: #fff;
-  }
-  .opciones button.secundario { background: var(--borde); }
 </style>
 </head>
 <body>
 <main>
   <h1><span>♦️</span> Erza-Bot-MD <span>♦️</span></h1>
   <p class="sub">Stickers con sonido desde un video</p>
-
-  <div class="prioridad">
-    <h2>⚡ Stickers prioritarios</h2>
-    <p>Transfiere a esta cuenta para que tus stickers sean <b>los primeros</b>, lleguen <b>más rápido</b> y también te lleguen <b>al privado</b>.</p>
-    <span class="mx">💵 Mínimo <b>$50 pesos</b> · 🇲🇽 Solo personas de México</span>
-    <button type="button" id="abrirPago">Quiero prioridad</button>
-  </div>
 
   <div class="tarjeta">
     <div class="destino"><span class="punto" id="punto"></span><span id="destino">Conectando con el bot…</span><span class="fila" id="fila"></span></div>
@@ -187,93 +145,6 @@
   <p class="nota">El sticker lo hace <b>tu teléfono</b>, así no hay que esperar fila.<br>La primera vez se descarga el conversor (unos 30 MB), después ya queda guardado.</p>
   <footer>© Mikelennn · © ErzaBot</footer>
 </main>
-
-<div class="modal" id="pago" role="dialog" aria-modal="true" aria-labelledby="tituloPago">
-  <div class="tarjeta">
-    <button type="button" class="cerrar" id="cerrarPago" aria-label="Cerrar">✕</button>
-    <h2 id="tituloPago">⚡ Stickers prioritarios</h2>
-    <p class="sub" style="text-align:left;margin:0">Transfiere <b>mínimo $50 pesos</b> a esta cuenta (solo México 🇲🇽) y luego manda tu comprobante.</p>
-    <div class="datos">
-      <div class="dato"><span>Nombre</span><b>Romina Madai</b></div>
-      <div class="dato"><span>Banco</span><b>Santander</b></div>
-      <div class="dato"><span>CLABE</span><b id="clabe">014890140031894817</b><button type="button" id="copiarClabe">Copiar</button></div>
-    </div>
-
-    <label class="zona comprobante" for="fotoPago" style="margin-top:12px">
-      <strong>📸 Sube tu comprobante</strong>
-      <span id="nombrePago">La captura o foto de que ya transferiste</span>
-      <img id="vistaPago" alt="" hidden>
-    </label>
-    <input type="file" id="fotoPago" accept="image/*">
-    <button type="button" id="enviarPago" disabled>Enviar</button>
-
-    <div class="opciones" id="opcionesPago">
-      <p>Mándalo por WhatsApp a <b>+52 294 199 2629</b></p>
-      <button type="button" id="compartirPago" hidden>📤 Enviar la imagen por WhatsApp</button>
-      <a class="boton" id="chatPago" target="_blank" rel="noopener">💬 Abrir chat con +52 294 199 2629</a>
-      <p id="notaPago" style="margin-top:10px;font-size:.82rem">Si se abre el chat, adjunta ahí la imagen de tu comprobante.</p>
-    </div>
-  </div>
-</div>
-
-<script>
-  // Ventana de pago para stickers prioritarios (no depende del resto de la página)
-  ;(() => {
-    const NUMERO = '522941992629'
-    const MENSAJE = 'Hola, ya transferí para tener stickers prioritarios ⚡ Aquí está mi comprobante:'
-    const $ = (id) => document.getElementById(id)
-    const modal = $('pago'), foto = $('fotoPago'), vista = $('vistaPago'), enviar = $('enviarPago')
-    let imagen = null
-
-    $('chatPago').href = `https://wa.me/${NUMERO}?text=${encodeURIComponent(MENSAJE)}`
-    $('abrirPago').addEventListener('click', () => modal.classList.add('abierto'))
-    $('cerrarPago').addEventListener('click', () => modal.classList.remove('abierto'))
-    modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('abierto') })
-
-    $('copiarClabe').addEventListener('click', async () => {
-      const b = $('copiarClabe')
-      try {
-        await navigator.clipboard.writeText($('clabe').textContent)
-        b.textContent = '¡Copiada!'
-      } catch (e) {
-        const r = document.createRange(); r.selectNodeContents($('clabe'))
-        const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r)
-        b.textContent = 'Cópiala'
-      }
-      setTimeout(() => (b.textContent = 'Copiar'), 2000)
-    })
-
-    foto.addEventListener('change', () => {
-      imagen = foto.files[0] || null
-      if (vista.src) URL.revokeObjectURL(vista.src)
-      if (imagen) {
-        vista.src = URL.createObjectURL(imagen)
-        vista.hidden = false
-        $('nombrePago').textContent = 'Toca para cambiar la imagen'
-      }
-      enviar.disabled = !imagen
-      $('opcionesPago').style.display = 'none'
-    })
-
-    enviar.addEventListener('click', () => {
-      if (!imagen) return
-      // En celulares que lo permiten, se comparte la imagen directo (eliges WhatsApp y el contacto)
-      const puedeCompartir = !!(navigator.canShare && navigator.canShare({ files: [imagen] }))
-      $('compartirPago').hidden = !puedeCompartir
-      $('notaPago').textContent = puedeCompartir
-        ? 'Con el primer botón eliges WhatsApp y el número. Con el segundo se abre el chat y ahí adjuntas la imagen.'
-        : 'Se abrirá el chat: adjunta ahí la imagen de tu comprobante.'
-      $('opcionesPago').style.display = 'block'
-      $('opcionesPago').scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-    })
-
-    $('compartirPago').addEventListener('click', async () => {
-      try {
-        await navigator.share({ files: [imagen], text: MENSAJE + ' (para +52 294 199 2629)' })
-      } catch (e) {}
-    })
-  })()
-</script>
 
 <script type="module">
   const $ = (id) => document.getElementById(id)
